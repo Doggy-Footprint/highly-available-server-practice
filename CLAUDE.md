@@ -17,12 +17,15 @@
    fix 단계에서 해당 주석을 제거한다. (`grep -rn "INTENDED-ISSUE"`로 남은 문제를 조회)
 3. **모든 fix 커밋에는 전/후 수치를 남긴다.**
    예: `fix(P1-02): selectinload 적용 (쿼리 201→3회, p95 1.9s→160ms @100vu)`
-4. **이슈 사이클 고정: break → measure → fix → verify → log.** 단계 생략 금지. (§7)
+4. **이슈 사이클 고정: break → verify-break(검증·승인) → measure → fix → verify → log.** 단계 생략 금지. 특히 verify-break의 사용자 승인 없이는 measure로 넘어가지 않는다. (§7)
 5. **Phase와 이슈는 사용자가 지시할 때만 진행한다.** 세션 시작 시 현재 이슈 ID를 확인하고,
    한 번에 하나의 이슈만 다룬다.
 6. **실험 로그 없으면 미완료.** `docs/experiments/<ID>.md`가 갱신되어야 이슈 완료로 간주한다.
 7. **결과를 조작하지 않는다.** 문제가 재현되지 않으면 그대로 기록하고,
    재현 조건(데이터량·동시성·리소스 제한)을 조정한 과정도 로그에 남긴다.
+8. **세션 시작 시 이슈에 맞는 모델을 사용자에게 제안한다.** (§15) 실행 중인 모델은 스스로 모델을 바꿀 수 없으므로,
+   현재 이슈가 상향/하향 대상이면 "이 작업은 <모델>(effort <레벨>) 권장 — `/model`로 전환 후 진행하시겠어요?"라고 먼저 묻는다.
+   사용자가 유지하겠다면 현재 모델로 진행한다.
 
 ---
 
@@ -185,15 +188,20 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 사용자가 "P1-03 하자"라고 하면:
 
 1. **break** — Phase 0에 이미 심어져 있으면 코드 위치만 확인. 없으면 이 커밋에서 심는다.
-2. **measure** — `load/k6/<id>.js` 작성·실행. k6 summary + Grafana + pg_stat_statements + `EXPLAIN (ANALYZE, BUFFERS)` 수집.
+2. **verify-break (검증·승인 게이트)** — 심은 문제가 백로그의 "심는 문제"와 정확히 일치하는지 스스로 점검한 뒤, **사용자 승인을 받고 나서** measure로 넘어간다. 승인 없이 진행하지 않는다.
+   - 점검 항목: (a) 심은 위치·방식이 백로그 정의와 일치하는가 (예: N+1을 async lazy-load가 아니라 루프 내 명시적 개별 쿼리로 심었는가), (b) `INTENDED-ISSUE: <ID>` 주석이 정확한 지점에 있는가, (c) 실수로 미리 고치거나 관련 없는 개선을 하지 않았는가, (d) 문제 외의 코드는 정상적으로 작성됐는가(실험 노이즈 차단).
+   - 산출물: 심은 지점 요약(파일·함수·라인), `grep -rn "INTENDED-ISSUE: <ID>"` 결과, "왜 이게 백로그의 그 문제인지" 1~2줄 근거를 사용자에게 제시.
+   - **승인**: 사용자가 명시적으로 확인("맞다/진행")해야 measure로 진행. 어긋나면 break로 되돌아가 다시 심는다. (승인 기록을 `docs/experiments/<id>.md`의 "재현 조건" 위에 남긴다.)
+3. **measure** — `load/k6/<id>.js` 작성·실행. k6 summary + Grafana + pg_stat_statements + `EXPLAIN (ANALYZE, BUFFERS)` 수집.
    핵심 수치를 measure 커밋 메시지에 요약. 재현 실패 시 조건 조정 과정도 기록.
-3. **fix** — 백로그의 "수정 방향"으로 **최소 수정**. `INTENDED-ISSUE` 주석 제거. 전→후 수치를 커밋 메시지에.
-4. **verify** — 동일 시나리오 재실행 + invariant 체크(`load/checks/`) + mixed 스모크로 회귀 확인.
-5. **log** — `docs/experiments/<id>.md` 작성.
+   - 주의: 여기서 재현이 안 되면 원인은 둘 중 하나 — "문제가 제대로 안 심겨서"(→ break로 복귀) 또는 "재현 조건이 약해서"(→ 조건 강화). verify-break를 통과했으므로 후자부터 의심한다.
+4. **fix** — 백로그의 "수정 방향"으로 **최소 수정**. `INTENDED-ISSUE` 주석 제거. 전→후 수치를 커밋 메시지에.
+5. **verify** — 동일 시나리오 재실행 + invariant 체크(`load/checks/`) + mixed 스모크로 회귀 확인.
+6. **log** — `docs/experiments/<id>.md` 작성.
 
 ### 커밋 컨벤션
 ```
-<type>(<ISSUE-ID>): <요약>        # type ∈ break | measure | fix | verify | feat | chore | docs
+<type>(<ISSUE-ID>): <요약>        # type ∈ break | verify-break | measure | fix | verify | feat | chore | docs
 ```
 - Phase 0 기능 구현: `feat(P0)[P1-02,P1-08]: 주문 API (N+1·루프 INSERT 포함)` — 심은 이슈 ID 병기
 - 이력 조회: `git log --oneline --grep P1-02` → 문제→재현→해결이 한 줄기로 보여야 한다
@@ -203,6 +211,7 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 ```markdown
 # <ID> <제목>
 ## 증상 / 가설
+## 심은 지점 & 검증 승인 (파일·함수·라인, INTENDED-ISSUE 위치, 승인 일시)
 ## 재현 조건 (시나리오 파일, 데이터 상태, 리소스 제한)
 ## Before  — TPS, p50/p95/p99, err%, DB 지표 + 근거(EXPLAIN, 캡처 경로: assets/)
 ## 원인 분석
@@ -304,7 +313,35 @@ compose 리소스 = Fargate task의 `cpu`/`memory`, RDS 인스턴스 클래스�
 1. 저장소 스캐폴딩(§3 구조) + `deploy/compose.yaml`(app·db·redis·nginx·mockpg) + `compose.obs.yaml`(관측 스택) + Makefile. **compose에 §13 리소스 프로파일(vCPU·RAM 제한)을 처음부터 걸고, `docker stats`로 실제 적용 확인.**
 2. Alembic 초기 마이그레이션 — §1 스키마 그대로. **PK 외 인덱스·수정용 컬럼 금지**
 3. seed 스크립트(COPY 기반) + `make seed`
-4. Phase 0 기능 구현 — §6의 "심는 문제"를 **정확히 포함**해서. 각 지점에 `INTENDED-ISSUE` 주석
+4. Phase 0 기능 구현 — §6의 "심는 문제"를 **정확히 포함**해서. 각 지점에 `INTENDED-ISSUE` 주석. 구현 후 이슈별로 verify-break 자기 점검 결과를 사용자에게 제시하고 승인받는다(§7-2).
 5. `load/k6/mixed.js` + smoke 통과 확인 → `git tag phase-0`
 
 Phase 0의 코드 리뷰 기준은 "잘 짰는가"가 아니라 **"백로그의 문제를 정확히 포함하는가"**다.
+
+---
+
+## 15. 세션별 모델 가이드
+`/model` 전환은 사람이 직접 하는 조작이다. 따라서 이 가이드의 역할은 두 가지다: (1) 사용자가 세션 시작 전 어떤 모델·effort로 열지 정하는 기준, (2) 실행 중인 모델이 §0-8에 따라 "지금 이 작업은 상향/하향이 낫다"고 **사용자에게 제안**하는 기준. 제안은 하되 결정과 전환은 사용자 몫이다.
+
+### 기본 전략
+- **기본값: Sonnet 5.** 대부분의 이슈 사이클(break·measure·정형 fix·verify·로그 작성)은 Sonnet 5로 충분하다.
+- **상향: Opus 4.8 (effort `xhigh`).** 반직관적 제약 준수나 다층 리팩터가 필요한 작업.
+- **하향: Haiku 4.5.** 판단보다 정형·반복 작업.
+
+### 작업 → 모델 매핑
+| 작업 | 권장 모델 | effort | 이유 |
+|---|---|---|---|
+| Phase 0 스캐폴딩 (문제 심기) | **Opus 4.8** | xhigh | "개선하지 말고 문제를 정확히 심어라"는 모델의 본능과 충돌 — 최고 난도. 실험 전체의 유일한 치명적 실패 지점 |
+| verify-break (심은 문제 검증) | 현재 모델 유지 | — | 심은 직후 같은 세션에서 자기 점검. 단 Phase 0을 Opus로 했으면 그대로 |
+| 얽히는 fix: P1-07, P2-02, P2-06, P2-10, P2-11 | **Opus 4.8** | xhigh | 트랜잭션 경계·큐·replica 정합성 등 다층 추론 |
+| 일반 이슈 break·measure·fix·verify | **Sonnet 5** | 기본 | 수정 방향이 명시된 최소 수정. near-top 추론을 낮은 비용·빠른 속도로 |
+| k6 스크립트·EXPLAIN 해석·실험 로그 | **Sonnet 5** | 기본 | 정형 분석/작성 |
+| seed·Makefile·docker/nginx 설정·로그 요약 | **Haiku 4.5** | — | 실수 비용 낮고 범위 좁음 |
+
+### 운용 흐름 (사용자 기준)
+1. 세션 시작 → 이슈 ID 확인 (한 번에 하나, §0-5).
+2. 위 표에서 해당 작업의 권장 모델 확인.
+3. 현재 모델과 다르면 `/model`로 전환 (`/model opus` 등, 재시작 불필요·즉시 적용). Opus 코딩 작업은 effort `xhigh`.
+4. 실행 중인 모델이 불일치를 감지하면 먼저 제안한다(§0-8). 사용자가 유지 선택 시 현재 모델로 진행.
+
+> 하나로 고정해야 한다면 이 프로젝트는 "문제를 정확히 심는" 규율 리스크 때문에 **Opus 4.8 단독**이 가장 안전하다. 비용이 부담되면 Sonnet 5 단독도 대부분 감당하나, Phase 0 문제 심기만은 상향을 권한다.
