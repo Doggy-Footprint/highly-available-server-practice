@@ -71,6 +71,11 @@ class Product(Base):
     # 검색·필터가 타는 컬럼(name, description, category_id, created_at)에 인덱스가 없다.
     # 20만 행에서 `ILIKE '%q%'` + 카테고리 필터가 전부 seq scan 이 된다.
     # fix 에서 복합 btree + pg_trgm GIN 을 추가한다.
+    #
+    # measure 유의(verify-break §5): 백로그(§6 P1-03)의 "status/기간 필터" 문구는 이
+    # 스키마와 맞지 않는다 — §1 에 products.status 가 없고 API 도 category/q/page 뿐이다.
+    # 구현(카테고리 + ILIKE)은 §1 API 표와 일치하며, fix 의 복합 btree 는 category_id 기준.
+    # (created_at 은 랭킹/집계용으로 남겨두되 P1-03 검색 경로의 대상은 아니다.)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     category_id: Mapped[int] = mapped_column(Integer, ForeignKey("categories.id"), nullable=False)
