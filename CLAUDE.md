@@ -69,6 +69,7 @@ seed는 실험 대상이 아니므로 **COPY 기반**으로 빠르게 (루프 IN
 - nginx — L7 LB (로컬에서 ALB 역할)
 - k6 (부하), Prometheus + Grafana + postgres_exporter + redis_exporter (관측)
 - docker compose로 전 구성 실행. mockpg는 초경량 FastAPI 별도 앱.
+- toxiproxy — app↔DB/Redis 사이 네트워크 지연·단절 주입 (P2-13/14 및 Phase 3 AZ 장애 리허설을 로컬에서 미리 재현)
 
 ## 3. 저장소 구조
 ```
@@ -103,6 +104,8 @@ make load S=p1-03  # load/k6/p1-03.js 실행
 make check S=oversell              # load/checks/oversell.sql 실행
 make psql / make redis-cli
 make kill-one      # 부하 중 앱 인스턴스 1대 강제 종료 (P2-08)
+make pause-redis / make unpause-redis   # Redis 장애 주입/복구 (P2-13)
+make stats         # docker stats — 리소스 제한 실제 적용 확인 (§13)
 make grafana       # localhost:3000
 ```
 
@@ -149,6 +152,9 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 | P1-07 | 주문 트랜잭션 | DB 트랜잭션 내부에서 결제 API 호출 | pool_size=10, 주문 200vu → pool timeout 다발 | 트랜잭션 분리 + 주문 상태머신(PENDING→PAID) | pool wait 0, 주문 처리량 회복 |
 | P1-08 | 주문 저장 | order_items를 루프 INSERT(건별 commit) | 아이템 10개 주문 부하 | bulk insert + 단일 트랜잭션 | 주문당 INSERT 왕복 1회 |
 | P1-09 | 인프라 | uvicorn 워커 1, 풀 기본값, 단일 인스턴스 | mixed 300 TPS 시도 → 한계 확인 | nginx + app 3대, 워커·풀·nginx 튜닝 | **P1 관문** 통과 |
+| P1-10 | 로그인 해싱 | bcrypt(cost 12+)를 async 핸들러에서 직접 실행 (CPU 블로킹) | 로그인 100vu 스파이크 → **무관한 GET까지** 지연 (P1-06과 달리 CPU-bound) | `run_in_executor`/스레드풀 오프로드 (또는 해싱 워커 분리) | 로그인 부하 중 `GET /products` p95 영향 없음 |
+| P1-11 | 목록 응답 크기 | `GET /cart`·`GET /orders`에 LIMIT 없이 전체 반환 | 주문 수천 건 헤비 유저 섞어 부하 → 직렬화·메모리 폭증 | 강제 페이지네이션 + `max_limit` 상한 | 응답 크기·p95 상한, N+1(P1-02)과 독립 검증 |
+| P1-12 | 세션 누수 | 예외 경로에서 DB 세션/커넥션 미반환 | mixed에 5% 에러 유발 요청 섞어 장시간 → 풀이 **서서히** 고갈 | 요청 스코프 세션의 확실한 정리(context manager/finally) | 장시간 부하에도 active connection 평탄, 누수 0 |
 
 ### Phase 2: 수천 TPS + 스파이크에서 터지는 것들
 | ID | 기능 | 심는 문제 / 상황 | 재현 방법 | 수정 방향 | 완료 기준 |
@@ -162,6 +168,12 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 | P2-07 | 결제 장애 | 실패 시 즉시 무한 재시도 | mockpg FAIL_RATE=0.5 → 재시도 폭풍으로 자체 과부하 | timeout + 지수 백오프 + 시도 상한 + circuit breaker | 장애 중 fast-fail, 복구 후 자동 정상화 |
 | P2-08 | 배포·장애 | 종료 시그널 무시, 헬스체크 없음 | 부하 중 `make kill-one` / 롤링 재시작 → 5xx | graceful shutdown + nginx health check | kill 중 err<0.5%, 롤링 무중단 |
 | P2-09 | 실시간 랭킹 | 요청마다 orders GROUP BY | 주문 부하와 동시 조회 → OLTP 간섭 | Redis sorted set 집계 (대안: 배치 테이블, replica 격리) | 랭킹 조회가 주문 p95에 영향 없음 |
+| P2-10 | worker 확정 | at-least-once 전달인데 consumer가 비멱등 (ack 전 죽으면 재처리) | P2-02 큐 도입 후 처리 도중 `make kill-one` → 같은 메시지 재전달로 중복 확정 | idempotent consumer(처리키 unique 제약/dedup) | 재전달 발생시에도 중복 확정 0 (P2-04와 다른 층위) |
+| P2-11 | 큐 운영 | worker 처리량 < 유입량 + poison message 무방비 | 유입 > 처리 스파이크로 Streams 무한 성장, 파싱불가 메시지 1개로 crash loop | lag/PEL 모니터링, consumer 스케일아웃, 재시도 상한 + DLQ | 스파이크 후 lag 수렴, poison 격리(서비스 지속) |
+| P2-12 | 핫로우 bloat | 스파이크 반복 후 딜 테이블 dead tuple 누적 (autovacuum 못 따라감) | P2-01/02 스파이크 여러 회 반복 → 딜 경로 점진적 성능 저하, `pg_stat_user_tables` 확인 | 테이블별 autovacuum 튜닝, fillfactor 조정(HOT update) | 반복 스파이크에도 딜 p95 안정, dead ratio 임계 이하 |
+| P2-13 | Redis 장애 | 세션·캐시·큐·선점을 전부 Redis에 의존, 폴백 없음 | `docker pause redis` → 전면 장애 | 캐시 miss시 DB fallback, 랭킹 폴백, 짧은 timeout — 부분 열화(graceful degradation) | Redis 다운 중에도 핵심 읽기 경로 생존, 복구 후 자동 정상화 |
+| P2-14 | 타임아웃 계층 | k6 < nginx < 앱 처리시간 불일치, DB `statement_timeout` 미설정 | 느린 요청에서 클라 타임아웃 후 재시도 → 서버는 좀비 작업 지속 → 부하 자기증폭 | 계층별 timeout 정렬(k6 > nginx > 앱 > DB) + `statement_timeout` | 타임아웃 시 좀비 작업 없음, 재시도 폭주 시 부하 발산 안 함 |
+| P2-15 | 무중단 마이그레이션 | P1-03 인덱스 생성을 `CONCURRENTLY` 없이 부하 중 실행 | 부하 중 인덱스 생성 → 쓰기 블로킹으로 5xx (fix 자체가 장애를 냄) | `CREATE INDEX CONCURRENTLY` + alembic `autocommit_block` | 부하 중 인덱스 생성해도 err<1%, 쓰기 무중단 |
 
 각 fix에는 트레이드오프가 있다 (예: 202 접수 패턴은 클라이언트 복잡도↑, replica는 지연 정합성 문제 발생).
 실험 로그의 "트레이드오프" 항목에 반드시 기록한다.
@@ -206,10 +218,10 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 
 - 도구: **k6**. 시나리오는 `load/k6/`에 이슈 ID로 저장 — 누구든 같은 명령으로 재현 가능해야 한다.
 - 공용 트래픽 믹스 `mixed.js`: 목록 35 / 상세 25 / 검색 10 / 주문 15 / 내역 10 / 로그인 5 (%)
+  - **Phase 2 믹스(`mixed-p2.js`)**: 인기 상품·실시간 랭킹 조회를 포함해야 P2-05/09 소재가 관문 트래픽에서 실제로 자극됨. 예: 목록 25 / 상세 20 / 검색 8 / 인기 10 / 랭킹 7 / 주문 20 / 내역 10 (딜 스파이크는 별도 시나리오로 중첩).
 - 프로파일 3종: `smoke`(10vu·1m) / `target`(관문 수치·5m) / `limit`(한계까지 ramp)
 - 표준 지표: TPS, p50/p95/p99, error rate, DB active connections, lock waits, CPU
-- **리소스 제한 필수**: compose에서 app `cpus:1.0, mem:512m`, db `cpus:2.0` 수준으로 고정.
-  제한 없으면 로컬 사양에 묻혀 문제가 안 터진다. k6 자체 CPU 소모도 감안할 것.
+- **리소스 제한 필수 — AWS 인스턴스 유사 환경으로 고정**: 제한 없으면 로컬 사양에 묻혀 문제가 안 터지고, 로컬↔AWS(Phase 3) 결과 비교도 무의미해진다. compose `deploy.resources.limits`로 컨테이너별 vCPU·RAM을 실제 인스턴스 타입에 맞춰 고정한다 (§13 참조). k6·관측 스택도 남은 코어를 소모하므로, **부하 대상 컨테이너 총합을 호스트 환경에 맞춰** 배분할 것.
 - 스파이크 실험 전 `make reset-deal`로 상태 초기화. invariant는 부하 후 `make check`로 검증.
 - 기능 정확성 pytest는 최소한으로. 이 프로젝트의 "테스트"는 부하 시나리오 + invariant SQL이다.
 
@@ -217,6 +229,7 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 - app: prometheus-fastapi-instrumentator / DB: postgres_exporter / Redis: redis_exporter
 - Grafana 프로비저닝 대시보드: 요청량·p95·에러, DB 커넥션·락·slow query, Redis
 - PostgreSQL: `pg_stat_statements` 활성(shared_preload_libraries), `log_min_duration_statement=200ms`
+- **메트릭 카디널리티 주의**: instrumentator가 path를 raw로 라벨링하면 `/products/{id}`가 20만 시계열이 되어 Prometheus가 먼저 죽는다. 반드시 라우트 템플릿(`/products/{id}`)으로 그룹핑할 것. (원한다면 이 자체를 미니 이슈로 심어 재현해도 좋다.)
 - 실험 캡처 이미지는 `docs/experiments/assets/`에 저장
 
 ## 10. 코딩 컨벤션
@@ -232,6 +245,9 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 - async SQLAlchemy는 lazy loading이 에러를 내므로, N+1은 **루프 내 명시적 개별 쿼리**로 심는다.
 - PG replica(P2-06)는 bitnami/postgresql의 `POSTGRESQL_REPLICATION_MODE` env 구성이 가장 간단.
 - macOS docker는 I/O 오버헤드가 크다 — 절대치보다 전/후 상대 비교 중심으로 해석.
+- `CREATE INDEX CONCURRENTLY`는 트랜잭션 블록 안에서 못 돈다 — alembic에서는 `op.get_context().autocommit_block()`으로 감싸야 한다 (P2-15).
+- Redis를 세션·캐시·큐에 함께 쓸 때 단일 장애점이 된다 — 장애 주입 실험(P2-13)은 `docker pause redis`로, 복구는 `docker unpause`로. `docker stop`은 커넥션 리셋이라 timeout 실험과 결이 다르니 구분할 것.
+- `deploy.resources`는 Swarm 전용 키라 `docker compose up`(v2 standalone)에서 **조용히 무시될 수 있다** — 이때는 최상위 `cpus:`/`mem_limit:`로 대체하거나 `docker compose --compatibility up`을 쓴다. 리소스 제한이 실제 걸렸는지 `docker stats`로 반드시 확인(제한이 안 걸리면 문제가 안 터진다).
 
 ## 12. AWS 매핑 (Phase 3 개요 — 상세는 Phase 2 완료 후 확장)
 | 로컬 | AWS |
@@ -247,9 +263,45 @@ Phase 3 과제: Terraform화 → 동일 k6 시나리오 재현 → RDS 강제 fa
 
 ---
 
-## 13. 첫 세션 절차 (Phase 0)
+## 13. 리소스 프로파일 — AWS 인스턴스 유사 환경
 
-1. 저장소 스캐폴딩(§3 구조) + `deploy/compose.yaml`(app·db·redis·nginx·mockpg) + `compose.obs.yaml`(관측 스택) + Makefile
+컨테이너를 실제 AWS 인스턴스 타입에 맞춰 vCPU·RAM을 고정한다. 목적은 (1) 로컬에서 문제가 실제로 터지게 만들고, (2) Phase 3 AWS 이전 시 로컬↔클라우드 결과를 직접 비교 가능하게 하는 것. **절대치보다 전/후 상대 비교가 본질**이지만, 프로파일을 고정해두면 세션·머신 간 재현성이 확보된다.
+
+### 기준 프로파일 (compose profile로 스위칭)
+| 역할 | AWS 유사 타입 | vCPU (`cpus`) | RAM (`mem_limit`) | 비고 |
+|---|---|---|---|---|
+| app (Phase 0, 단일) | t3.small | 1.0 | 512m | P1-09 전, 한계 관찰용 |
+| app ×N (Phase 1+) | t3.small ×N | 각 1.0 | 각 512m | N=3 기본. Fargate task와 매핑 |
+| worker (Phase 2) | t3.small | 1.0 | 512m | Streams consumer |
+| PostgreSQL primary | db.t3.medium | 2.0 | 4g | `shared_buffers`≈1g로 함께 튜닝 |
+| PostgreSQL replica | db.t3.medium | 2.0 | 4g | Phase 2 |
+| Redis | cache.t3.micro | 0.5 | 512m | `maxmemory` = mem_limit 90%, eviction 정책 명시 |
+| nginx | — | 0.5 | 128m | LB |
+| mockpg | — | 0.5 | 256m | 외부 의존성 mock |
+
+### compose 표기 (예시)
+```yaml
+services:
+  app:
+    deploy:
+      resources:
+        limits:   { cpus: "1.0", memory: 512m }
+        reservations: { cpus: "0.5", memory: 256m }
+```
+- **`limits`뿐 아니라 `reservations`도 설정** — 스케줄링 경합에서 최소 보장을 확보해 측정 노이즈를 줄인다.
+- compose v2 standalone에서 `deploy.resources`가 무시되면 `cpus:`/`mem_limit:` 최상위 키로 대체(§ 함정 노트).
+- **호스트 예산 계산**: 부하 대상(app×3 + db + redis + nginx + mockpg) vCPU 합이 물리 코어의 절반 이하가 되도록. 나머지 절반은 k6 + Prometheus/Grafana + 커널 몫. 초과하면 CPU steal로 측정이 오염된다.
+- **RAM은 실측 후 조인다**: PG `shared_buffers`, work_mem, 커넥션당 메모리를 고려. mem_limit에 닿으면 OOM kill되므로, 처음엔 넉넉히 두고 안정 후 하향.
+- Redis는 `maxmemory`와 eviction 정책(`allkeys-lru` 등)을 명시 — 미설정 시 mem_limit 도달로 컨테이너가 통째로 죽어 P2-13과 혼동된다.
+
+### AWS 매핑 (Phase 3)
+compose 리소스 = Fargate task의 `cpu`/`memory`, RDS 인스턴스 클래스로 그대로 이관. Phase 3에서 동일 프로파일의 인스턴스 타입을 골라 로컬 실험 수치와 나란히 비교한다.
+
+---
+
+## 14. 첫 세션 절차 (Phase 0)
+
+1. 저장소 스캐폴딩(§3 구조) + `deploy/compose.yaml`(app·db·redis·nginx·mockpg) + `compose.obs.yaml`(관측 스택) + Makefile. **compose에 §13 리소스 프로파일(vCPU·RAM 제한)을 처음부터 걸고, `docker stats`로 실제 적용 확인.**
 2. Alembic 초기 마이그레이션 — §1 스키마 그대로. **PK 외 인덱스·수정용 컬럼 금지**
 3. seed 스크립트(COPY 기반) + `make seed`
 4. Phase 0 기능 구현 — §6의 "심는 문제"를 **정확히 포함**해서. 각 지점에 `INTENDED-ISSUE` 주석
