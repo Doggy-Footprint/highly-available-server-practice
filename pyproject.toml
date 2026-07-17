@@ -39,6 +39,20 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 의 의존성 주입 헬퍼는 인자 기본값에서 호출하는 것이 정상 사용법이다.
+# 이들만 B008(function-call-in-default-argument) 예외로 둔다.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
