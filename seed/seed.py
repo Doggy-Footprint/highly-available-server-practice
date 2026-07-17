@@ -38,6 +38,12 @@ N_CART_ITEMS = 20_000
 HEAVY_USERS = 200
 HEAVY_USER_ORDERS = 3_000
 
+# P2-03(교차 장바구니 → deadlock) 소재: 같은 상품 쌍을 반대 순서로 담은 유저쌍.
+# 헤비 유저(1..200)와 겹치지 않게 201 부터 배치한다. 쌍 i = (유저 2i+201, 2i+202).
+CROSS_CART_PAIRS = 500
+CROSS_CART_USER_START = HEAVY_USERS + 1  # 201
+CROSS_CART_USER_END = HEAVY_USERS + 2 * CROSS_CART_PAIRS  # 1_200
+
 # 딜 전용 상품을 뒤쪽에 따로 떼어 둔다. 일반 주문은 이 상품을 절대 참조하지 않는다.
 # 그래야 oversell 검증(load/checks/oversell.sql)이 "이 상품의 판매량 = 딜 판매량" 으로
 # 모호함 없이 성립한다.
@@ -205,12 +211,28 @@ def gen_deals(now: datetime, prices: list[Decimal]) -> Iterator[DealRow]:
 
 def gen_cart_items() -> Iterator[tuple[int, int, int]]:
     # P2-03(교차 장바구니 동시 주문 → deadlock) 의 소재.
-    # 같은 상품 조합을 서로 다른 순서로 담은 카트가 있어야 락 순서가 엇갈린다.
+    # 쌍 i 의 두 유저는 같은 상품 두 개(p1, p2)를 서로 반대 순서로 담는다. COPY 는
+    # yield 순서 그대로 적재하고(=ctid 순서), 카트 조회(app/cart/repository)가 ctid 로
+    # 정렬해 돌려주므로, 이 두 카트로 동시에 주문하면 재고 락 획득 순서가 실제로
+    # 교차한다: A 는 p1→p2, B 는 p2→p1. 나머지 물량은 무작위 카트(일반 트래픽용)로
+    # 채우되, 교차 쌍 유저의 카트는 오염되지 않게 그 범위 밖 유저만 고른다.
     rng = random.Random(SEED + 5)
-    seen: set[tuple[int, int]] = set()
     made = 0
+    for i in range(CROSS_CART_PAIRS):
+        user_a = CROSS_CART_USER_START + 2 * i
+        user_b = user_a + 1
+        p1 = rng.randrange(1, NORMAL_PRODUCT_MAX + 1)
+        p2 = rng.randrange(1, NORMAL_PRODUCT_MAX + 1)
+        while p2 == p1:
+            p2 = rng.randrange(1, NORMAL_PRODUCT_MAX + 1)
+        yield (user_a, p1, rng.randint(1, 3))
+        yield (user_a, p2, rng.randint(1, 3))
+        yield (user_b, p2, rng.randint(1, 3))
+        yield (user_b, p1, rng.randint(1, 3))
+        made += 4
+    seen: set[tuple[int, int]] = set()
     while made < N_CART_ITEMS:
-        user_id = rng.randrange(1, N_USERS + 1)
+        user_id = rng.randrange(CROSS_CART_USER_END + 1, N_USERS + 1)
         product_id = rng.randrange(1, NORMAL_PRODUCT_MAX + 1)
         if (user_id, product_id) in seen:
             continue

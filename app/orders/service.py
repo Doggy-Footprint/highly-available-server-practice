@@ -42,8 +42,9 @@ async def create_order_from_cart(session: AsyncSession, user: User) -> Order:
 
     total = Decimal(0)
     # INTENDED-ISSUE: P2-03
-    # 재고 차감 락을 카트에 담긴 순서(정렬하지 않은 임의 순서)로 획득한다. 서로 교차된
-    # 카트를 든 두 주문이 동시에 들어오면 락 순서가 엇갈려 deadlock 이 난다.
+    # 재고 차감 락을 카트에 담은 순서(cart repository 가 ctid=삽입 순서로 반환)로
+    # 획득한다. 같은 상품 쌍을 반대 순서로 담은 두 카트(seed 의 교차 카트 쌍)가 동시에
+    # 주문하면 락 획득 순서가 엇갈려 deadlock 이 난다.
     # 지금은 아래 P1-08 의 건별 commit 이 매 아이템마다 락을 즉시 풀어 마스킹되어 있고,
     # P1-08 fix 로 트랜잭션이 하나로 합쳐지면 그때 발현한다. fix 는 PK 정렬 후 잠금.
     for cart_item, product in rows:
