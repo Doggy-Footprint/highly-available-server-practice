@@ -1,0 +1,173 @@
+# FlashMart 기본 스택. 관측 스택은 compose.obs.yaml 을 겹쳐 올린다.
+#
+# 리소스 제한(§13)에 대하여
+# ------------------------
+# 제한이 실제로 걸리지 않으면 문제가 로컬 사양에 묻혀서 안 터진다. 반드시 `make stats` 로 확인할 것.
+# `deploy.resources` 는 Swarm 전용 키라 compose v2 standalone 에서 조용히 무시되는 경우가 있는데,
+# 이 저장소를 만든 환경(compose v2.32.4 / Docker 27.5)에서는 정상 적용되는 것을 확인했다
+# (`docker inspect` → NanoCpus=..., Memory=...). 다른 머신에서 `make stats` 의 LIMIT 이
+# 호스트 전체 메모리로 나오면 최상위 `cpus:` / `mem_limit:` 로 바꾸거나 `--compatibility` 를 쓴다.
+#
+# 예외 하나: `reservations.cpus` 는 이 환경에서도 무시된다 (CpuShares=0 으로 남음).
+# 메모리 예약만 실제로 걸린다. CPU 최소 보장을 compose 로는 얻을 수 없다는 뜻이므로,
+# 측정 노이즈는 아래 예산으로 관리한다.
+#
+# 호스트 예산 (§13)
+# ----------------
+# 기기마다 코어가 다르므로 절대 수치를 여기에 못 박지 않는다. 정해야 하는 것은 비율이다:
+#   부하 대상(app×N + db + redis + nginx + mockpg)  vs  k6 + 관측 스택 + 커널
+# k6 도 컨테이너로 도는(= Docker VM 안에서 코어를 먹는) 점을 빠뜨리기 쉽다.
+#
+# 이때 "limits 의 합" 으로 재면 과하게 보수적이다 — limits 는 천장이지 예약이 아니고,
+# 위에 적었듯 CPU 예약은 걸리지도 않는다. 부하 중 실제로 동시에 포화되는 집합으로 계산한다:
+#   Phase 0: app 1.0 + db 2.0                       ≈ 3.0   (redis·mockpg 는 거의 안 쓴다)
+#   Phase 1: app×3 3.0 + db 2.0                     ≈ 5.0   (+ k6 ~1.5, 관측 ~1.0)
+#
+# 산술은 어디까지나 출발점이고, 판정은 실측으로 한다:
+#   부하 중 `make stats` 에서 app 이 자기 limit(CPU 100%)에 붙으면 정상 — 의도한 대로
+#   t3.small 한 대가 포화된 것이다. limit 아래에서 못 올라가면 VM 이 과구독된 것이고,
+#   그 측정치는 버린다 (부하 대상이 아니라 관측 도구 때문에 나온 수치다).
+#
+# RAM 은 CPU 와 규칙이 다르다:
+#   mem_limit 합이 VM RAM 을 넘는 것 자체는 오버커밋이고 정상이다 — 여기서도 천장의 합은
+#   의미가 없다 (실사용은 전부 합쳐 수백 MiB 수준). 다만 초과했을 때의 결과가 다르다:
+#   CPU 는 느려지고 끝이지만 RAM 은 OOM kill 이고, 그건 P2-13(Redis 장애 주입)과 구분이 안 된다.
+#   그래서 CPU 천장은 넉넉히 두되 RAM 천장은 실측에 맞춰 조인다 (§13 "RAM은 실측 후 조인다").
+#
+# 참고 — 이 스캐폴딩을 만든 기기: M2 Pro 10코어(6P+4E) / 16GB, Docker VM 10 CPU · 7.65 GiB.
+#   Phase 0 은 여유. Phase 1 은 부하 대상 실동시 수요 ~5.0 에 k6 ~1.5 + 관측 ~1.0 이 얹혀
+#   VM 10 코어에 들어가지만 호스트 몫이 얇아진다. 관문 측정 전 `make stats` 로 확인할 것.
+
+name: flashmart
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: flashmart
+      POSTGRES_PASSWORD: flashmart
+      POSTGRES_DB: flashmart
+    command:
+      - postgres
+      # §9 관측: 상위 쿼리를 pg_stat_statements 로 뽑고, 200ms 이상은 로그로 남긴다.
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - log_min_duration_statement=200
+      # §13: db.t3.medium(2 vCPU / 4g) 에 맞춰 shared_buffers 를 함께 조인다.
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      # max_connections 는 기본값(100) 그대로 둔다. 인스턴스·워커·풀을 늘리면
+      # 여기에 먼저 부딪히는데, 그 계산을 P1-09 에서 직접 하게 하려는 것이다 (§11).
+    ports:
+      # 호스트에 이미 네이티브 PostgreSQL 이 돌고 있으면 5432 가 겹친다.
+      # 그때 docker 는 와일드카드(*:5432)에 붙어서 기동은 성공하지만,
+      # 127.0.0.1 에 직접 붙은 네이티브 쪽이 localhost 접속을 가져간다 —
+      # GUI 툴로 붙으면 "데이터가 없다" 며 한참 헤매게 된다. 어긋난 포트로 피한다.
+      # (컨테이너 안에서는 계속 5432 다. make psql / app / k6 는 영향 없다.)
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashmart -d flashmart"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 4g }
+        reservations: { memory: 2g }
+
+  redis:
+    image: redis:7-alpine
+    # maxmemory 와 eviction 정책을 반드시 명시한다 (§13).
+    # 미설정이면 mem_limit(512m)에 닿아 컨테이너가 통째로 OOM kill 되는데,
+    # 그러면 P2-13(Redis 장애 주입) 실험과 구분이 안 된다. mem_limit 의 90% 로 잡는다.
+    command:
+      - redis-server
+      - --maxmemory
+      - 460mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "no"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 512m }
+        reservations: { memory: 256m }
+
+  mockpg:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.mockpg
+    environment:
+      # 실험별로 주입한다. 예: P1-06 은 LATENCY_MS=800, P2-07 은 FAIL_RATE=0.5.
+      LATENCY_MS: "${MOCKPG_LATENCY_MS:-0}"
+      FAIL_RATE: "${MOCKPG_FAIL_RATE:-0}"
+    ports:
+      - "8100:8000"
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256m }
+        reservations: { memory: 128m }
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://flashmart:flashmart@db:5432/flashmart
+      REDIS_URL: redis://redis:6379/0
+      MOCKPG_URL: http://mockpg:8000
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    # 호스트 포트를 여기서 열지 않는다 (§11).
+    # scale 시 충돌하고, 포트 범위(`8000-8009:8000`)로 피하면 이번엔 어느 replica 가
+    # 어느 포트에 붙었는지가 비결정적이 된다 — 컨테이너를 재생성할 때마다 번호가 밀린다.
+    # 실험실에서 대상 주소가 흔들리면 안 된다.
+    #   N=1 (Phase 0): compose.direct.yaml 이 8000 에 고정 노출한다.
+    #   N>1 (Phase 1+): nginx(8080)만 노출한다.
+    # k6 는 어느 쪽이든 도커 네트워크 안에서 붙으므로 영향받지 않는다.
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mockpg:
+        condition: service_started
+    # 헬스체크를 일부러 걸지 않는다 — P2-08(헬스체크 없음 / 종료 시그널 무시)의 소재다.
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512m }
+        reservations: { memory: 256m }
+
+  nginx:
+    # Phase 0 에서는 뜨지 않는다. `make up N=3` 이 lb 프로파일을 켠다.
+    profiles: ["lb"]
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - app
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128m }
+        reservations: { memory: 64m }
+
+volumes:
+  pgdata:

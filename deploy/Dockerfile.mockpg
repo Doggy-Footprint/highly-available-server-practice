@@ -1,0 +1,17 @@
+# 외부 결제 PG mock. 실험 대상이 아니므로 의존성을 최소로 유지한다.
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /srv
+
+RUN uv pip install --system "fastapi>=0.115" "uvicorn[standard]>=0.32" "pydantic>=2.9"
+
+COPY mockpg /srv/mockpg
+
+EXPOSE 8000
+
+CMD ["uvicorn", "mockpg.main:app", "--host", "0.0.0.0", "--port", "8000"]

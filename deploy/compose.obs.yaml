@@ -1,0 +1,78 @@
+# 관측 스택 (§9). compose.yaml 위에 겹쳐 올린다:
+#   docker compose -f deploy/compose.yaml -f deploy/compose.obs.yaml up -d
+# Makefile 의 `make up` 이 기본으로 함께 올린다. `make grafana` 로 대시보드를 연다.
+#
+# 관측 스택은 부하 대상이 아니다. 다만 §13 예산에서 부하 대상의 반대편(k6 + 관측 + 커널)에
+# 서는 쪽이므로 여기에도 상한을 걸어 둔다 — 안 걸면 Prometheus 가 부하 중 코어를 가져가서
+# 측정 대상이 아니라 측정 도구 때문에 수치가 흔들린다.
+#
+# 상한 근거는 실측이다 (§13 "RAM은 실측 후 조인다").
+# 타겟 4개를 5초 간격으로 긁는 이 규모에서 실제 사용량은:
+#   Prometheus 43MiB · Grafana 71MiB · exporter 각 13MiB, CPU 는 모두 0.1% 미만.
+# 처음엔 넉넉히(1g/512m) 뒀다가 여기까지 내렸다. 부하 대상에 그만큼을 돌려주기 위해서다.
+# 관측 스택이 죽으면 실험은 계속되지만 수치를 못 본다 — mem_limit 에 닿는지
+# `make stats` 로 가끔 확인하고, 닿으면 그때 올린다.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 512m }
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 256m }
+
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    environment:
+      DATA_SOURCE_NAME: "postgresql://flashmart:flashmart@db:5432/flashmart?sslmode=disable"
+      # 락 대기·slow query 를 보려면 pg_stat_statements 수집이 필요하다.
+      PG_EXPORTER_INCLUDE_DATABASES: flashmart
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: "0.15", memory: 128m }
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: "0.15", memory: 128m }
+
+volumes:
+  promdata:
+  grafanadata:

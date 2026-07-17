@@ -1,0 +1,52 @@
+[project]
+name = "flashmart"
+version = "0.0.0"
+description = "FlashMart — 부하·확장성 실험실 (Fail & Fix Lab)"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "redis>=5.2",
+    "httpx>=0.28",
+    "bcrypt>=4.2",
+    "prometheus-fastapi-instrumentator>=7.0",
+    # Phase 0 의 결제 호출은 의도적으로 동기 라이브러리를 쓴다 (P1-06).
+    # P1-06 fix 에서 httpx.AsyncClient 로 옮기며 이 의존성을 제거한다.
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*", "mockpg*", "seed*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = []
+# 마이그레이션은 alembic 이 생성하는 형태를 그대로 둔다.
+exclude = "^migrations/"
+
+[[tool.mypy.overrides]]
+# asyncpg 는 py.typed 를 제공하지 않는다 (seed 가 COPY 때문에 직접 쓴다).
+module = ["asyncpg.*"]
+ignore_missing_imports = true

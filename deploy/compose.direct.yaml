@@ -1,0 +1,13 @@
+# Phase 0 전용 override — app 을 호스트 8000 에 고정으로 노출한다.
+#
+# app 1대일 때만 유효하다. `--scale app=N` (N>1) 과 함께 쓰면 replica 들이 같은
+# 호스트 포트를 다투다 기동이 실패한다. 그래서 Makefile 이 N=1 일 때만 이 파일을 겹치고,
+# N>1 에서는 nginx 를 통하게 한다 (§11: "호스트 포트 바인딩 제거, nginx만 노출").
+#
+# 사용:  make up          → 이 파일이 자동으로 겹쳐진다 (localhost:8000)
+#        make up N=3      → 겹치지 않는다 (localhost:8080, nginx)
+
+services:
+  app:
+    ports:
+      - "8000:8000"

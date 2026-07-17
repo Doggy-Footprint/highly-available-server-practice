@@ -1,0 +1,26 @@
+global:
+  # 부하 실험은 수십 초~수 분 단위로 끝난다. 15s 스크랩으로는 스파이크가 뭉개진다.
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: app
+    # `--scale app=N` 으로 인스턴스가 늘어도 자동으로 따라가야 한다.
+    # docker 내장 DNS 가 서비스명 `app` 에 대해 모든 replica 의 A 레코드를 준다.
+    dns_sd_configs:
+      - names: ["app"]
+        type: A
+        port: 8000
+        refresh_interval: 10s
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres_exporter:9187"]
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis_exporter:9121"]
