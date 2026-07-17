@@ -52,6 +52,14 @@ async def get_order(session: AsyncSession, order_id: int) -> Order | None:
     return await session.get(Order, order_id)
 
 
+async def get_order_for_update(session: AsyncSession, order_id: int) -> Order | None:
+    # SELECT ... FOR UPDATE — 주문 로우 락을 잡은 채 반환한다. `session.get` 과 달리
+    # identity map 에 객체가 있어도 반드시 SQL 이 나가므로, 호출 시점의 트랜잭션이
+    # 커넥션을 체크아웃해 커밋까지 쥐게 된다. P1-07(트랜잭션 안 결제 호출)의 소재.
+    stmt = select(Order).where(Order.id == order_id).with_for_update()
+    return (await session.scalars(stmt)).first()
+
+
 async def list_orders_for_user(session: AsyncSession, user_id: int) -> Sequence[Order]:
     # INTENDED-ISSUE: P1-11
     # LIMIT 없이 유저의 주문 전체를 가져온다. seed 의 헤비 유저(3,000건)면 이 한 방에

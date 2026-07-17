@@ -59,12 +59,15 @@ async def create_order_from_cart(session: AsyncSession, user: User) -> Order:
     await session.commit()
 
     # INTENDED-ISSUE: P1-07
-    # 결제(외부 API)를 DB 트랜잭션 안에서 호출한다. session.get 으로 커넥션을 쥔 채
-    # 동기 결제(P1-06, ~800ms)를 기다리므로 그동안 풀 커넥션 하나가 묶인다.
-    # pool_size=10 에 주문 200vu 면 pool timeout 이 쏟아진다.
+    # 결제(외부 API)를 DB 트랜잭션 안에서 호출한다. "결제하는 동안 주문이 안 바뀌게"
+    # SELECT ... FOR UPDATE 로 주문 로우를 잠근 뒤(이때 실제 SQL 이 나가 커넥션이
+    # 체크아웃된다), 그 커넥션과 로우 락을 쥔 채 동기 결제(P1-06, ~800ms)를 기다린다.
+    # 풀 기본값(pool_size=5 + max_overflow=10)에 주문 200vu 면 pool timeout 이 쏟아진다.
+    # (주의: identity map 히트인 session.get 은 SQL 이 안 나가 커넥션을 잡지 않는다 —
+    #  verify-break 에서 그 형태로는 문제가 성립하지 않음을 확인하고 FOR UPDATE 로 재심음.)
     # fix 에서 결제를 트랜잭션 밖으로 빼고 주문 상태머신(PENDING→PAID)으로 분리한다.
     async with session.begin():
-        locked = await repository.get_order(session, order.id)  # 커넥션 확보 + 트랜잭션 시작
+        locked = await repository.get_order_for_update(session, order.id)  # 커넥션+로우 락 점유
         result = payment_client.pay(order.id, float(total))  # P1-06 블로킹 + P2-07 재시도
         if locked is not None:
             locked.status = OrderStatus.PAID
