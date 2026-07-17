@@ -299,7 +299,8 @@ services:
 ```
 - **`limits`뿐 아니라 `reservations`도 설정** — 스케줄링 경합에서 최소 보장을 확보해 측정 노이즈를 줄인다.
 - compose v2 standalone에서 `deploy.resources`가 무시되면 `cpus:`/`mem_limit:` 최상위 키로 대체(§ 함정 노트).
-- **호스트 예산 계산**: 부하 대상(app×3 + db + redis + nginx + mockpg) vCPU 합이 물리 코어의 절반 이하가 되도록. 나머지 절반은 k6 + Prometheus/Grafana + 커널 몫. 초과하면 CPU steal로 측정이 오염된다.
+- **호스트 예산 계산**: 실행 기기에 따라 부하 대상 (app×3 + db + redis + nginx + mockpg)과 k6 + Prometheus/Grafana + 커널의 비율을 정해 부하 대상의 상한을 정한다.
+
 - **RAM은 실측 후 조인다**: PG `shared_buffers`, work_mem, 커넥션당 메모리를 고려. mem_limit에 닿으면 OOM kill되므로, 처음엔 넉넉히 두고 안정 후 하향.
 - Redis는 `maxmemory`와 eviction 정책(`allkeys-lru` 등)을 명시 — 미설정 시 mem_limit 도달로 컨테이너가 통째로 죽어 P2-13과 혼동된다.
 
