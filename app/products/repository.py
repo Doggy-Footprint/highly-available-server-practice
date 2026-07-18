@@ -1,6 +1,7 @@
 """products 데이터 접근.
 
-검색/목록/집계가 전부 인덱스 없는 컬럼을 타서 seq scan 이 된다 (P1-03/04/05, P2-05).
+검색(P1-03)은 인덱스가 붙었다. 목록 페이지네이션(P1-04)·목록 total(P1-05)·인기 상품
+집계(P2-05)는 아직 인덱스 없는 컬럼을 타거나 매 요청 무거운 쿼리를 실행한다.
 """
 
 from __future__ import annotations
@@ -18,9 +19,8 @@ def _filtered(q: str | None, category_id: int | None) -> Select[tuple[Product]]:
     if category_id is not None:
         stmt = stmt.where(Product.category_id == category_id)
     if q:
-        # INTENDED-ISSUE: P1-03
-        # name/description 에 인덱스가 없어 `ILIKE '%q%'` 가 20만 행을 전부 seq scan 한다.
-        # 선행 와일드카드(%q%)라 btree 로도 못 타고, fix 에서 pg_trgm GIN + 복합 btree 를 만든다.
+        # P1-03 fix: name/description 에 pg_trgm GIN 인덱스가 있어 선행 와일드카드
+        # `ILIKE '%q%'` 도 인덱스를 탄다 (마이그레이션 0002).
         pattern = f"%{q}%"
         stmt = stmt.where(Product.name.ilike(pattern) | Product.description.ilike(pattern))
     return stmt

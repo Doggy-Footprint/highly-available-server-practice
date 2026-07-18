@@ -2,8 +2,9 @@
 
 읽기 전 주의:
 
-    이 스키마에는 PK 외 인덱스가 하나도 없다. 실수가 아니라 P1-03(검색 인덱스 없음)의
-    소재다. users.email 의 UNIQUE 도 인덱스를 만들기 때문에 일부러 걸지 않았다.
+    이 스키마는 기본적으로 PK 외 인덱스가 없다 — 실수가 아니라 각 이슈가 fix 되기 전까지
+    의도된 상태다 (products 는 P1-03 fix 로 인덱스가 붙었다, 마이그레이션 0002 참고).
+    users.email 의 UNIQUE 도 인덱스를 만들기 때문에 아직 일부러 걸지 않았다.
     `idempotency_key`(P2-04) 처럼 수정 단계에서 생길 컬럼도 미리 넣지 않는다.
     인덱스·제약을 추가하는 것은 해당 이슈의 fix 마이그레이션에서만 한다.
 """
@@ -18,6 +19,7 @@ from sqlalchemy import (
     BigInteger,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -67,15 +69,9 @@ class Category(Base):
 class Product(Base):
     __tablename__ = "products"
 
-    # INTENDED-ISSUE: P1-03
-    # 검색·필터가 타는 컬럼(name, description, category_id, created_at)에 인덱스가 없다.
-    # 20만 행에서 `ILIKE '%q%'` + 카테고리 필터가 전부 seq scan 이 된다.
-    # fix 에서 복합 btree + pg_trgm GIN 을 추가한다.
-    #
-    # measure 유의(verify-break §5): 백로그(§6 P1-03)의 "status/기간 필터" 문구는 이
-    # 스키마와 맞지 않는다 — §1 에 products.status 가 없고 API 도 category/q/page 뿐이다.
-    # 구현(카테고리 + ILIKE)은 §1 API 표와 일치하며, fix 의 복합 btree 는 category_id 기준.
-    # (created_at 은 랭킹/집계용으로 남겨두되 P1-03 검색 경로의 대상은 아니다.)
+    # P1-03 fix: category_id 에 btree, name/description 에 pg_trgm GIN. 카테고리만 필터하면
+    # btree 를, ILIKE '%q%' 는 GIN trigram 을 타고, 둘 다 있으면 planner 가 BitmapAnd 로
+    # 묶는다 (마이그레이션 0002 참고).
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     category_id: Mapped[int] = mapped_column(Integer, ForeignKey("categories.id"), nullable=False)
@@ -89,6 +85,19 @@ class Product(Base):
 
     category: Mapped[Category] = relationship(lazy="raise")
     reviews: Mapped[list[Review]] = relationship(back_populates="product", lazy="raise")
+
+    __table_args__ = (
+        Index("ix_products_category_id", "category_id"),
+        Index(
+            "ix_products_name_trgm", "name", postgresql_using="gin", postgresql_ops={"name": "gin_trgm_ops"}
+        ),
+        Index(
+            "ix_products_description_trgm",
+            "description",
+            postgresql_using="gin",
+            postgresql_ops={"description": "gin_trgm_ops"},
+        ),
+    )
 
 
 class Review(Base):
