@@ -93,6 +93,7 @@ flashmart/
 │   └── nginx/  prometheus/  grafana/
 ├── docs/experiments/    # _template.md, P1-01.md ...
 ├── Makefile
+├── reports/
 └── CLAUDE.md
 ```
 
@@ -198,6 +199,7 @@ Phase 2:  k6 → nginx → app×3 ─┬──→ PG primary ──(streaming)�
 4. **fix** — 백로그의 "수정 방향"으로 **최소 수정**. `INTENDED-ISSUE` 주석 제거. 전→후 수치를 커밋 메시지에.
 5. **verify** — 동일 시나리오 재실행 + invariant 체크(`load/checks/`) + mixed 스모크로 회귀 확인.
 6. **log** — `docs/experiments/<id>.md` 작성.
+7. **reports** - 각 항목 별로 실제 문제의 재현 경로, 측정 방법, 수정 방법, 결과, 요약 및 해당 이슈 항목의 문제에 대한 설명을 첨부하여 `reports/<id>.md`에 저장.
 
 ### 커밋 컨벤션
 ```
