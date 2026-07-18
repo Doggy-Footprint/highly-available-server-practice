@@ -1,7 +1,7 @@
 """auth 도메인 로직 — 세션 발급/검증과 현재 사용자 의존성.
 
-P1-01(프로세스 내 세션 저장)의 소재인 `_SESSIONS` dict 가 여기 있다. 세션 저장소와
-그것을 읽는 `get_current_user` 를 한곳에 두어, 무엇이 심긴 문제인지 눈에 보이게 한다.
+세션은 Redis 에 저장한다(P1-01 fix). 어떤 인스턴스가 로그인을 처리했든, 다른 인스턴스가
+같은 Redis 를 보고 토큰을 검증할 수 있어 app 이 stateless 하다.
 """
 
 from __future__ import annotations
@@ -10,18 +10,16 @@ import secrets
 
 import bcrypt
 from fastapi import Depends, Header, HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import repository
 from app.core.deps import get_db
+from app.core.redis import get_redis
 from app.models import User
 
-# INTENDED-ISSUE: P1-01
-# 로그인 세션을 프로세스 메모리(dict)에 담는다. 이 프로세스가 발급한 토큰은 다른
-# 인스턴스/워커의 dict 엔 존재하지 않는다. app 을 여러 대로 띄우거나 uvicorn 워커를
-# 늘리면, 로그인한 인스턴스가 아닌 곳으로 라우팅된 /auth/me 가 랜덤하게 401 을 낸다.
-# fix 에서 Redis 세션(또는 JWT)으로 옮겨 stateless 화한다.
-_SESSIONS: dict[str, int] = {}
+_SESSION_KEY_PREFIX = "session:"
+_SESSION_TTL_SECONDS = 60 * 60 * 24  # 24h
 
 
 def hash_password(password: str) -> str:
@@ -39,7 +37,7 @@ async def signup(session: AsyncSession, email: str, password: str) -> User:
     return await repository.create_user(session, email, pw_hash)
 
 
-async def login(session: AsyncSession, email: str, password: str) -> str:
+async def login(session: AsyncSession, redis: Redis, email: str, password: str) -> str:
     user = await repository.get_user_by_email(session, email)
     # INTENDED-ISSUE: P1-10
     # cost 12 bcrypt 검증(~수백 ms, CPU 바운드)을 async 핸들러(이벤트 루프) 위에서 그대로
@@ -49,22 +47,22 @@ async def login(session: AsyncSession, email: str, password: str) -> str:
     if user is None or not verify_password(password, user.pw_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     token = secrets.token_urlsafe(32)
-    _SESSIONS[token] = user.id  # P1-01: 이 프로세스에만 저장된다
+    await redis.set(f"{_SESSION_KEY_PREFIX}{token}", user.id, ex=_SESSION_TTL_SECONDS)
     return token
 
 
 async def get_current_user(
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ) -> User:
     if authorization is None or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing token")
     token = authorization.removeprefix("Bearer ")
-    # P1-01: 다른 인스턴스가 발급한 토큰이면 이 dict 엔 없어 None → 401.
-    user_id = _SESSIONS.get(token)
+    user_id = await redis.get(f"{_SESSION_KEY_PREFIX}{token}")
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown token")
-    user = await repository.get_user(session, user_id)
+    user = await repository.get_user(session, int(user_id))
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unknown user")
     return user

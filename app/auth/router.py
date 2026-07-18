@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import schemas, service
 from app.core.config import get_settings
 from app.core.deps import get_db
+from app.core.redis import get_redis
 from app.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,9 +28,11 @@ async def signup(
 
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(
-    body: schemas.LoginRequest, session: AsyncSession = Depends(get_db)
+    body: schemas.LoginRequest,
+    session: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ) -> schemas.TokenResponse:
-    token = await service.login(session, body.email, body.password)
+    token = await service.login(session, redis, body.email, body.password)
     return schemas.TokenResponse(token=token, instance_id=_settings.instance_id)
 
 
