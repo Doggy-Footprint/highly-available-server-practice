@@ -1,7 +1,7 @@
 """orders 데이터 접근.
 
-주문 생성(건별 commit·임의 순서 재고 차감), 주문 조회(N+1 소재), 실시간 랭킹(집계)의
-저수준 쿼리들. N+1 은 service 에서 이 함수들을 루프로 호출해 만든다.
+주문 생성(건별 commit·임의 순서 재고 차감), 주문 조회(selectinload 로 items·product 를
+한 번에 적재), 실시간 랭킹(집계)의 저수준 쿼리들.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import Order, OrderItem, OrderStatus, Payment, PaymentStatus, Product
 
@@ -49,7 +50,12 @@ async def create_payment(
 
 
 async def get_order(session: AsyncSession, order_id: int) -> Order | None:
-    return await session.get(Order, order_id)
+    stmt = (
+        select(Order)
+        .where(Order.id == order_id)
+        .options(selectinload(Order.items).selectinload(OrderItem.product))
+    )
+    return (await session.scalars(stmt)).first()
 
 
 async def get_order_for_update(session: AsyncSession, order_id: int) -> Order | None:
@@ -65,12 +71,12 @@ async def list_orders_for_user(session: AsyncSession, user_id: int) -> Sequence[
     # LIMIT 없이 유저의 주문 전체를 가져온다. seed 의 헤비 유저(3,000건)면 이 한 방에
     # 수천 로우가 나온다. 이어지는 N+1(service) 과 겹쳐 응답 크기·쿼리 수가 동시에 폭증한다.
     # (P1-02 와 독립 검증: fix 는 강제 페이지네이션 + max_limit.)
-    stmt = select(Order).where(Order.user_id == user_id).order_by(Order.id.desc())
-    return (await session.scalars(stmt)).all()
-
-
-async def get_order_items(session: AsyncSession, order_id: int) -> Sequence[OrderItem]:
-    stmt = select(OrderItem).where(OrderItem.order_id == order_id)
+    stmt = (
+        select(Order)
+        .where(Order.user_id == user_id)
+        .order_by(Order.id.desc())
+        .options(selectinload(Order.items).selectinload(OrderItem.product))
+    )
     return (await session.scalars(stmt)).all()
 
 

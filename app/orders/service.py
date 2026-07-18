@@ -7,7 +7,6 @@
   P1-07  결제를 DB 트랜잭션 안에서 호출 (+ payments.client 의 P1-06/P2-07)
 조회 플로우에는:
   P1-11  LIMIT 없는 전체 조회 (repository)
-  P1-02  주문→아이템→상품 루프 개별 조회 (N+1)
 """
 
 from __future__ import annotations
@@ -22,7 +21,6 @@ from app.cart import repository as cart_repo
 from app.models import Order, OrderStatus, PaymentStatus, User
 from app.orders import repository, schemas
 from app.payments import client as payment_client
-from app.products import repository as product_repo
 
 # 실시간 랭킹 집계 창(P2-09). 최근 이만큼의 주문만 집계한다.
 _RANKING_WINDOW = timedelta(days=7)
@@ -78,23 +76,19 @@ async def create_order_from_cart(session: AsyncSession, user: User) -> Order:
     return order
 
 
-async def _build_order_view(session: AsyncSession, order: Order) -> schemas.OrderView:
-    # INTENDED-ISSUE: P1-02
-    # 주문마다 아이템을 개별 쿼리로, 아이템마다 상품을 또 개별 쿼리로 가져온다 (N+1).
-    # 주문 N개·평균 아이템 M개면 1 + N + N*M 쿼리. async lazy-load 는 에러라(models
-    # lazy="raise"), 루프 내 명시적 개별 쿼리로 심는다. fix 에서 selectinload/JOIN.
-    items = await repository.get_order_items(session, order.id)
-    item_views: list[schemas.OrderItemView] = []
-    for it in items:
-        product = await product_repo.get_product(session, it.product_id)  # N+1 의 +M
-        item_views.append(
-            schemas.OrderItemView(
-                product_id=it.product_id,
-                name=product.name if product is not None else "?",
-                qty=it.qty,
-                unit_price=it.unit_price,
-            )
+def _build_order_view(order: Order) -> schemas.OrderView:
+    # repository 가 selectinload(Order.items).selectinload(OrderItem.product) 로
+    # 이미 적재해둔 관계를 그대로 읽는다 — 요청당 쿼리 수는 repository 쪽 쿼리 수(상수)로
+    # 고정되고, 뷰 조립 단계에서는 추가 쿼리가 나가지 않는다.
+    item_views = [
+        schemas.OrderItemView(
+            product_id=it.product_id,
+            name=it.product.name if it.product is not None else "?",
+            qty=it.qty,
+            unit_price=it.unit_price,
         )
+        for it in order.items
+    ]
     return schemas.OrderView(
         id=order.id,
         status=order.status,
@@ -105,10 +99,9 @@ async def _build_order_view(session: AsyncSession, order: Order) -> schemas.Orde
 
 
 async def list_orders(session: AsyncSession, user: User) -> schemas.OrderListResponse:
-    # P1-11: LIMIT 없이 전체를 가져온 뒤,
+    # P1-11: LIMIT 없이 전체를 가져온다 (별도 이슈, 미수정).
     orders = await repository.list_orders_for_user(session, user.id)
-    # P1-02: 그 전체를 루프 돌며 아이템·상품을 개별 조회한다.
-    views = [await _build_order_view(session, order) for order in orders]
+    views = [_build_order_view(order) for order in orders]
     return schemas.OrderListResponse(user_id=user.id, order_count=len(views), orders=views)
 
 
@@ -118,7 +111,7 @@ async def get_order_detail(
     order = await repository.get_order(session, order_id)
     if order is None or order.user_id != user.id:
         return None
-    return await _build_order_view(session, order)
+    return _build_order_view(order)
 
 
 async def realtime_ranking(session: AsyncSession, limit: int) -> list[schemas.RankingEntry]:
