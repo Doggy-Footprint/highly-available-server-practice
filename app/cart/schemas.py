@@ -1,5 +1,3 @@
-"""cart 요청/응답 스키마."""
-
 from __future__ import annotations
 
 from decimal import Decimal

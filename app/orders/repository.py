@@ -1,9 +1,3 @@
-"""orders 데이터 접근.
-
-주문 생성(건별 commit·임의 순서 재고 차감), 주문 조회(selectinload 로 items·product 를
-한 번에 적재), 실시간 랭킹(집계)의 저수준 쿼리들.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence

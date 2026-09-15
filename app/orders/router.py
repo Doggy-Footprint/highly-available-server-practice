@@ -1,8 +1,3 @@
-"""orders 라우터 — 주문 생성/내역/상세, 실시간 랭킹.
-
-`/rankings/realtime` 는 orders 집계라 orders 모듈에 둔다 (별도 라우터, prefix `/rankings`).
-"""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

@@ -1,5 +1,3 @@
-"""deals 라우터 — 선착순 딜 구매."""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

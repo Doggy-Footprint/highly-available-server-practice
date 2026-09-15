@@ -1,8 +1,3 @@
-"""products 라우터 — 목록/검색, 상세, 메인 인기 상품.
-
-`/main/popular` 는 상품 랭킹이라 products 모듈에 둔다 (별도 라우터, prefix `/main`).
-"""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

@@ -1,5 +1,3 @@
-"""deals 데이터 접근."""
-
 from __future__ import annotations
 
 from sqlalchemy import update

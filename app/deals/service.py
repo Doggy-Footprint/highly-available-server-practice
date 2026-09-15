@@ -1,5 +1,3 @@
-"""deals 도메인 로직 — 선착순 구매."""
-
 from __future__ import annotations
 
 from fastapi import HTTPException, status

@@ -1,5 +1,3 @@
-"""애플리케이션 설정 — 전부 env 로 주입한다 (§10)."""
-
 from __future__ import annotations
 
 import socket
@@ -22,7 +20,6 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://flashmart:flashmart@db:5432/flashmart"
     db_echo: bool = False
 
-    # Phase 1 에서 세션·캐시로 도입한다. Phase 0 코드는 아직 사용하지 않는다.
     redis_url: str = "redis://redis:6379/0"
 
     mockpg_url: str = "http://mockpg:8000"

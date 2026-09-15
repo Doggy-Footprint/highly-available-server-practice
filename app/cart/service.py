@@ -1,5 +1,3 @@
-"""cart 도메인 로직."""
-
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession

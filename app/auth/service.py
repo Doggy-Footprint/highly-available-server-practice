@@ -1,7 +1,6 @@
 """auth 도메인 로직 — 세션 발급/검증과 현재 사용자 의존성.
 
-세션은 Redis 에 저장한다(P1-01 fix). 어떤 인스턴스가 로그인을 처리했든, 다른 인스턴스가
-같은 Redis 를 보고 토큰을 검증할 수 있어 app 이 stateless 하다.
+세션은 Redis 에 저장한다(P1-01 fix).
 """
 
 from __future__ import annotations

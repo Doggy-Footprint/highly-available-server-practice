@@ -1,5 +1,3 @@
-"""cart 라우터 — 담기 / 조회."""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
