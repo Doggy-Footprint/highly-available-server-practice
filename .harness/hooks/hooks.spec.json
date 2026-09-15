@@ -1,0 +1,36 @@
+{
+  "hooks": [
+    {
+      "event": "SessionEnd",
+      "command": "python3 \"{root}/.harness/hooks/cleanup.py\""
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "clear",
+      "targets": ["codex"],
+      "_note": "/clear in codex trigger this",
+      "command": "python3 \"{root}/.harness/hooks/cleanup.py\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "python3 \"{root}/.harness/hooks/session_lock.py\""
+    },
+    {
+      "event": "SessionEnd",
+      "command": "python3 \"{root}/.harness/hooks/session_lock.py\""
+    },
+    {
+      "event": "SubagentStart",
+      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+    },
+    {
+      "event": "SubagentStop",
+      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+    }
+  ]
+}

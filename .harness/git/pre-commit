@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Verifies the deterministic rules from the harness instruction block before
+# allowing a commit. Installed via core.hooksPath=.harness/git.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+harness_dir="$repo_root/.harness"
+
+if command -v python3 >/dev/null 2>&1; then
+  contracts_rel="$(HARNESS_LIB_DIR="$harness_dir/lib" python3 -c "
+import os, sys
+sys.path.insert(0, os.environ['HARNESS_LIB_DIR'])
+import config
+p = config.load_paths()
+print(p.contracts.resolve().relative_to(config.REPO_ROOT.resolve()))
+")"
+
+  staged_contracts="$(git diff --cached --name-only --diff-filter=d | grep "^${contracts_rel}/" || true)"
+  if [ -n "$staged_contracts" ]; then
+    echo "pre-commit: WARNING — session-scoped contract files are staged:" >&2
+    echo "$staged_contracts" | sed 's/^/  - /' >&2
+    echo "  ${contracts_rel}/ is deleted on merge and at session end. Commit only if this task spans commits." >&2
+  fi
+
+  python3 "$harness_dir/git/verify_rules.py"
+else
+  echo "pre-commit: python3 not found, skipping harness rule verification" >&2
+fi
+
+common_dir="$(git rev-parse --git-common-dir)"
+local_hook="$common_dir/hooks/pre-commit"
+if [ -x "$local_hook" ]; then
+  exec "$local_hook" "$@"
+fi

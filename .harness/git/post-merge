@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# The configured contracts dir is session-scoped: a merge deletes it.
+# Installed via core.hooksPath=.harness/git.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+harness_dir="$repo_root/.harness"
+
+if command -v python3 >/dev/null 2>&1; then
+  echo '{"hook_event_name":"PostMerge"}' | python3 "$harness_dir/hooks/cleanup.py"
+fi
+
+common_dir="$(git rev-parse --git-common-dir)"
+local_hook="$common_dir/hooks/post-merge"
+if [ -x "$local_hook" ]; then
+  exec "$local_hook" "$@"
+fi
