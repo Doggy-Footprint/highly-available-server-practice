@@ -5,7 +5,7 @@ claude.tools: Read, Write, Edit, Grep, Glob, Bash
 claude.disallowedTools: mcp__*
 claude.model: sonnet
 claude.effort: medium
-codex.model: gpt-5.6-terra
+codex.model: gpt-6-sol
 codex.model_reasoning_effort: medium
 codex.sandbox_mode: workspace-write
 ---

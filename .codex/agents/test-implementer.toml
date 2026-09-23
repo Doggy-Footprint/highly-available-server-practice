@@ -1,6 +1,6 @@
 name = "test-implementer"
 description = "Writes verification for an approved workflow-approach spec without seeing the implementation. Use only in that workflow's Implement + Test step, in parallel with implementer."
-model = "gpt-5.6-terra"
+model = "gpt-6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 developer_instructions = """
