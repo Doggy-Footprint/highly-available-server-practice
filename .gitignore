@@ -16,7 +16,8 @@ load/results/
 
 # 실험 캡처는 docs/experiments/assets/ 에 커밋한다 (여기서 제외하지 않음)
 .DS_Store
-agent-docs/contracts/.running/
-agent-docs/contracts/.seed/
 .harness/sessions/.running/
 .harness/**/__pycache__
+agent-docs/specs/.active
+agent-docs/specs/.running/
+agent-docs/specs/.seed/

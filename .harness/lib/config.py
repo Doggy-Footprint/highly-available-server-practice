@@ -22,7 +22,8 @@ class Paths:
         self.rejections = self.docs_root / "rejections"
         self.handoff = self.docs_root / "handoff"
         self.synced_comments = self.docs_root / "synced-comments"
-        self.contracts = self.docs_root / "contracts"
+        self.specs = self.docs_root / "specs"
+        self.spec_logs = self.docs_root / "spec-logs"
 
 
 def load_paths() -> Paths:

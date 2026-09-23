@@ -18,7 +18,7 @@ A comment/docstring is allowed only when it records a non-obvious:
 Do not use comments to narrate code, restate names/types/control flow, provide tutorials, or justify ordinary implementation choices.
 
 ## Index & Staleness Management
-1. Every agent-managed directory (e.g., `agent-docs/adr`, `agent-docs/rejections`, `agent-docs/handoff`) must contain `index.md` and `stale.md`.
+1. Every agent-managed directory (e.g., `agent-docs/adr`, `agent-docs/rejections`, `agent-docs/handoff`) must contain `index.md`, `stale.md`, and a `stale/` directory. `agent-docs/specs/` and `agent-docs/spec-logs/` are workflow state and immutable run records, so they are exempt.
 2. File Naming: `<16-char-hex-id>-<kebab-case-name>.md` (e.g., `3f8a9c12b0e45d67-auth-flow.md`).
 3. `index.md` Format: entries separated by `---`:
    ````
@@ -27,7 +27,7 @@ Do not use comments to narrate code, restate names/types/control flow, provide t
    Related Files: <comma-separated repo paths>
    Related Symbols: <comma-separated function/class/module names>
    ````
-4. `stale.md` Format: append one stale file per line.
+4. When marking a document stale, remove its entry from `index.md`, append that index block verbatim to `stale.md`, and move the document to `stale/`.
 
 ## Shared Comment & Docstring Synchronization Rules
 
@@ -101,13 +101,13 @@ Required file structure:
 
 The ADR "DO NOT Include" list applies.
 
-When the revisit condition is met and the alternative is adopted, append the file to `stale.md`.
+When the revisit condition is met and the alternative is adopted, remove its entry from `index.md` and move the file to `stale/`.
 
 ## Handoff Rule
 
 Directory: `agent-docs/handoff/`.
 
-Write when a task stops incomplete: contract-workflow Limit reached, the user pauses or stops mid-task, or the user requests it.
+Write when a workflow-approach task exhausts its verifier budget, cannot make progress without a user decision or external change, the user pauses or stops mid-task, or the user requests it.
 
 Required file structure:
 
@@ -117,11 +117,20 @@ Required file structure:
 - `## Failed Attempts` (table `| attempt | failure evidence | cause |`, cause marked `verified` or `hypothesis`)
 - `## Next Step`
 - `## Open Questions`
-- `## Contract Snapshot` (contract content at stop, or `none`)
+- `## Spec` (active or archived spec path, version, status, and run ID)
+- `## Execution Ledger` (findings and dispositions, evidence and mutation outcomes, correction and verifier counters)
+
+An incomplete nonterminal workflow keeps its active spec in `agent-docs/specs/`
+and records this handoff path in the spec. A limit handoff points to the archived
+spec in `agent-docs/spec-logs/`. The handoff must still state remaining work and
+failed attempts without requiring telemetry to reconstruct them.
+Handoffs created before harness 0.7.0 may retain `## Contract Snapshot` instead
+of `## Spec` and `## Execution Ledger`; do not rewrite historical records solely
+to change their format.
 
 When resuming, never delete or edit existing Failed Attempts rows; only append.
 
-When the task completes, append the file to `stale.md`.
+When the task completes, remove its entry from `index.md` and move the file to `stale/`.
 
 # Task Guide
 

@@ -2,14 +2,14 @@
   "hooks": [
     {
       "event": "SessionEnd",
-      "command": "python3 \"{root}/.harness/hooks/cleanup.py\""
+      "command": "python3 \"{root}/.harness/bin/spec_lifecycle.py\" session"
     },
     {
       "event": "SessionStart",
       "matcher": "clear",
       "targets": ["codex"],
       "_note": "/clear in codex trigger this",
-      "command": "python3 \"{root}/.harness/hooks/cleanup.py\""
+      "command": "python3 \"{root}/.harness/bin/spec_lifecycle.py\" session"
     },
     {
       "event": "SessionStart",
@@ -21,16 +21,34 @@
     },
     {
       "event": "SubagentStart",
-      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+      "command": "python3 \"{root}/.harness/hooks/spec_gate.py\""
     },
     {
       "event": "SubagentStop",
-      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+      "command": "python3 \"{root}/.harness/hooks/spec_gate.py\""
     },
     {
       "event": "PreToolUse",
       "matcher": "Bash",
-      "command": "python3 \"{root}/.harness/hooks/contract_gate.py\""
+      "command": "python3 \"{root}/.harness/hooks/spec_gate.py\""
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash|Write|Edit",
+      "targets": ["claude"],
+      "command": "python3 \"{root}/.harness/hooks/telemetry_hook.py\""
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash|apply_patch",
+      "targets": ["codex"],
+      "command": "python3 \"{root}/.harness/hooks/telemetry_hook.py\""
+    },
+    {
+      "event": "PostToolUseFailure",
+      "matcher": "Bash",
+      "targets": ["claude"],
+      "command": "python3 \"{root}/.harness/hooks/telemetry_hook.py\""
     }
   ]
 }

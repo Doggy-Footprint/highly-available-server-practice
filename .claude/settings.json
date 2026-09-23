@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/cleanup.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/bin/spec_lifecycle.py\" session"
           }
         ]
       },
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/contract_gate.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/spec_gate.py\""
           }
         ]
       }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/contract_gate.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/spec_gate.py\""
           }
         ]
       }
@@ -54,7 +54,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/contract_gate.py\""
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/spec_gate.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/telemetry_hook.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.harness/hooks/telemetry_hook.py\""
           }
         ]
       }

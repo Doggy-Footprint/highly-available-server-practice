@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Backs up files before a contract-workflow seed injection and restores them.
+"""Backs up files before a workflow-approach seed injection and restores them.
 manifest.json is written last, so a backup interrupted before it exists is
 detected as partial and never restored from.
 """
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 import config  # noqa: E402
 
 REPO_ROOT = config.REPO_ROOT.resolve()
-SEED_DIR = config.load_paths().contracts / ".seed"
+SEED_DIR = config.load_paths().specs / ".seed"
 MANIFEST = SEED_DIR / "manifest.json"
 
 

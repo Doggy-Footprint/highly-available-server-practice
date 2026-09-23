@@ -3,7 +3,7 @@
 block (see harness/instructions/harness-block.md).
 
 Covers only rules that can be verified without judgement calls:
-  - Index & Staleness Management (file naming, index.md/stale.md presence
+  - Index & Staleness Management (file naming, index.md/stale/ presence
     and structure), scoped to docs_root
   - Shared Comment & Docstring Synchronization (synced id / version / count
     consistency between code and <docs_root>/synced-comments/<id>.md, plus
@@ -56,9 +56,9 @@ REQUIRED_HEADINGS = {
         "## Failed Attempts",
         "## Next Step",
         "## Open Questions",
-        "## Contract Snapshot",
     ],
 }
+WORKFLOW_DOC_DIRS = {"specs", "spec-logs"}
 
 
 def rel(path: Path) -> str:
@@ -70,6 +70,9 @@ def iter_docs_root_files():
         return
     for path in PATHS.docs_root.rglob("*"):
         if not path.is_file():
+            continue
+        docs_parts = path.relative_to(PATHS.docs_root).parts
+        if "stale" in docs_parts or (docs_parts and docs_parts[0] in WORKFLOW_DOC_DIRS):
             continue
         if any(part in EXCLUDE_DIRS for part in path.relative_to(REPO_ROOT).parts):
             continue
@@ -94,12 +97,12 @@ def check_index_and_staleness(errors: list):
 
     for directory, files in managed_dirs.items():
         index_md = directory / "index.md"
-        stale_md = directory / "stale.md"
+        stale_dir = directory / "stale"
 
         if not index_md.exists():
             errors.append(f"{rel(directory)}: missing required index.md")
-        if not stale_md.exists():
-            errors.append(f"{rel(directory)}: missing required stale.md")
+        if not stale_dir.is_dir():
+            errors.append(f"{rel(directory)}: missing required stale/ directory")
         if not index_md.exists():
             continue
 
@@ -130,7 +133,7 @@ def check_index_and_staleness(errors: list):
         for name in sorted(unlisted):
             errors.append(f"{rel(directory)}: {name} is not listed in index.md")
 
-        stray = listed_files - actual_files - {"index.md", "stale.md"}
+        stray = listed_files - actual_files - {"index.md"}
         for name in sorted(stray):
             errors.append(f"{rel(index_md)}: lists {name!r} but no such file exists")
 
@@ -283,6 +286,11 @@ def check_required_headings(errors: list):
                 h for h in headings
                 if not re.search(rf"(?m)^{re.escape(h)}\s*$", text)
             ]
+            if directory == PATHS.handoff and not re.search(r"(?m)^## Contract Snapshot\s*$", text):
+                missing.extend(
+                    heading for heading in ("## Spec", "## Execution Ledger")
+                    if not re.search(rf"(?m)^{re.escape(heading)}\s*$", text)
+                )
             if missing:
                 errors.append(f"{rel(path)}: missing required heading(s) {missing}")
 
