@@ -51,7 +51,7 @@ Out of scope: <explicit exclusions>
 # Paths
 Implementation: <comma-separated repo paths>
 Tests: <comma-separated repo paths>
-Test command: <one shell command covering all automated functional and quality checks>
+Test command: <one shell command covering all automated functional and quality checks; fails when a structure-based coverage target is missed>
 Review evidence: <named procedure/output, or none — reason>
 
 # Signatures
@@ -82,7 +82,7 @@ Review evidence: <named procedure/output, or none — reason>
 | id | characteristic / subcharacteristic | target and context | measure method / inputs / unit | threshold and direction | evidence: automated, review, mutation | source |
 
 # Verification Obligations
-| id | parent requirement/Case ids | variant and target surface | test layer and selection policy | boundary/transition/combination | observation and expected result | evidence procedure |
+| id | parent requirement/Case ids | variant and target surface | test layer and selection policy | ISO/IEC/IEEE 29119-4 technique | coverage items | coverage target | observation and expected result | evidence procedure |
 
 # Assumptions and Defaults
 | id | decision | evidence and uncertainty | user approval or explicit delegation |
@@ -111,8 +111,10 @@ Every intent, requirement, Case, quality requirement, obligation, and assumption
 has a stable id. Each applicable quality characteristic has at least one quality
 requirement. Each quality requirement defines the measured property and context,
 method and input quantities, unit, threshold and pass direction, evidence
-procedure, and source. ISO/IEC 25023 supplies measure concepts; it does not supply
-project-specific pass thresholds. The user approves those thresholds.
+procedure, and source. ISO/IEC 25023 supplies measure concepts and ISO/IEC/IEEE
+29119-4 supplies test design techniques with their coverage measures; neither
+supplies project-specific pass thresholds or coverage targets. The user approves
+both.
 
 `level` is `normal`, `boundary`, `error`, or `edge`; include every level or a
 `none — <reason>` row. Error rows name both signal and post-failure state.
@@ -122,24 +124,41 @@ test roles never read Implementation.
 # Verification model
 
 Define a finite set of independently checkable obligations before dispatch. Each
-row identifies the required variant, observable target surface, test layer, and
-selection policy. Enumerate required combinations as separate stable ids or an
-explicit finite list; listing targets and variants does not imply their Cartesian
-product. Distinguish test layer (unit, integration, end-to-end) from Case `level`.
-State which variants need exhaustive checks and which need representative checks,
-including the selected representatives and rationale. Define lifecycle boundaries
-such as same-process re-import versus restart. Resolve ambiguous selection or
-boundary terms before approval; never let a test role choose missing policy.
+row identifies the required variant, observable target surface, test layer,
+selection policy, and one ISO/IEC/IEEE 29119-4 test design technique with its
+coverage items and approved coverage target. Coverage is exercised coverage items
+divided by declared coverage items. Distinguish test layer (unit, integration,
+end-to-end) from Case `level`. Define lifecycle boundaries such as same-process
+re-import versus restart. Resolve ambiguous selection or boundary terms before
+approval; never let a test role choose missing policy.
+
+- Specification-based: equivalence partitioning, classification tree, boundary
+  value analysis (2- or 3-value), syntax, combinatorial (each choice, base choice,
+  pairwise, all combinations), decision table, cause-effect graphing, state
+  transition, scenario, random, and metamorphic testing. Enumerate coverage items
+  finitely as stable ids or an explicit list; listing targets and variants does not
+  imply their Cartesian product. A target below 100% names the selected items and
+  the rationale.
+- Structure-based: statement, branch, decision, branch-condition, branch-condition
+  combination, MC/DC, and data flow testing. The spec names the measuring tool and
+  the Implementation scope; main measures coverage through the Test command and
+  maps each shortfall to behavior. Unexercised code for undeclared behavior is a
+  spec gap or implementation defect; for declared behavior it is a test defect.
+  Test roles receive only that behavior and measured values, never Implementation
+  locations.
+- Experience-based (error guessing): coverage items are the guessed defects; the
+  target is `none — experience-based`.
 
 Derive obligations from every in-scope requirement, including errors and quality
-requirements. Use boundary values, transitions and combinations where required
-by the behavior or approved risk policy; justify excluded dimensions. A finite
-map does not excuse a missing user requirement. Such omissions are spec challenges,
-not permission to expand test scope silently.
+requirements. Select the techniques the behavior or approved risk policy requires;
+justify excluded techniques and dimensions. A finite map does not excuse a missing
+user requirement. Such omissions are spec challenges, not permission to expand
+test scope silently.
 
 Evidence is sufficient when it observes the required behavior at the declared
-surface and layer, uses an independent expected result, and distinguishes the
-specified failure from success. A test name or filled map is not proof. Additional
+surface and layer, uses an independent expected result, distinguishes the
+specified failure from success, and meets the approved coverage target. A test
+name or filled map is not proof. Additional
 examples alone do not establish a gap: a blocking finding must identify a required
 obligation and a concrete violating behavior the current evidence fails to reject,
 or cite a precise conflict or omission in the approved requirements.
@@ -192,14 +211,16 @@ recovery abort. Do not emit markers for ordinary tool activity.
    active spec exists, do not start another workflow. If its handoff is valid,
    resume only when requested. Without a handoff, compare `base_commit` to HEAD,
    summarize progress and drift, and ask the user whether to resume or archive it
-   as aborted. Read deciding code yourself; delegate only location discovery. For pre-0.9
-   specs, reconcile obligations and audit state with the verification model before
-   dispatch. Do not infer prior acceptance from a passing suite. Obtain approval
+   as aborted. Read deciding code yourself; delegate only location discovery. For
+   pre-0.10 specs, reconcile obligations and audit state with the verification
+   model before dispatch, giving each obligation a technique, coverage items and
+   target. Do not infer prior acceptance from a passing suite. Obtain approval
    for changed verification policy and preserve invocation counts and history.
 2. **Draft and approve (main).** Derive functional requirements and all nine
    quality applicability decisions. Use `requirement-oracle` for decisions the
-   user cannot assess. Define measures, thresholds, evidence, and traceability
-   with `max_verifier_invocations: 2`. Obtain whole-spec approval, set status
+   user cannot assess. Define measures, thresholds, 29119-4 techniques, coverage
+   items and targets, evidence, and traceability with
+   `max_verifier_invocations: 2`. Obtain whole-spec approval, set status
    `active`, then run and check:
    `python3 .harness/bin/spec_lifecycle.py start --spec PATH --run-id ID`.
    Emit telemetry start only after lifecycle start succeeds.
@@ -208,8 +229,9 @@ recovery abort. Do not emit markers for ordinary tool activity.
    and complete:
    - implementer: path/version, implementation direction, quality constraints,
      risks, allowed non-Test checks, and excluded approaches;
-   - test-implementer: path/version, conventions, risk model, independent oracle,
-     automated and review evidence, test level, and excluded approaches.
+   - test-implementer: path/version, conventions, risk model, 29119-4 techniques
+     and coverage items, independent oracle, automated and review evidence, test
+     level, and excluded approaches.
 4. **Reconcile (main).** Collect both reports using bounded waits. If a subagent
    stalls, interrupt and diagnose before retrying. Resolve challenges with
    spec/code evidence; amend or reject each with a reason. Reopen prior spec
@@ -272,10 +294,11 @@ recovery abort. Do not emit markers for ordinary tool activity.
    roles. Reconcile, rerun the restored Test command, repeat confirming mutations,
    then return to Verify for a fresh audit.
 8. **Stop condition.** Complete only when every required functional and quality
-   obligation passes, review artifacts exist, the verifier audit is complete with
-   no open blocking finding, every obligation has current accepted evidence, and
-   the selected confirming mutations fail for the intended assertion. Advisory
-   suggestions may remain; unresolved spec challenges may not.
+   obligation passes at its approved coverage target, review artifacts exist, the
+   verifier audit is complete with no open blocking finding, every obligation has
+   current accepted evidence, and the selected confirming mutations fail for the
+   intended assertion. Advisory suggestions may remain; unresolved spec challenges
+   may not.
    If further verification is required after two invocations, stop with status
    `limit` before making corrections that require that audit. For ordinary
    corrections blocked on a user decision or external change, finish independent

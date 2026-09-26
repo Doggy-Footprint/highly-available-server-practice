@@ -30,11 +30,14 @@ pending and invalidated entries fully, including siblings sharing the same patte
 or helper. Missing audit history is pending, never presumed acceptance.
 
 Evidence must observe the required behavior at the declared surface and layer with
-an independent oracle. Check required boundaries, transitions, failure signals and
-post-failure state. Identify concrete violating behaviors such as constant results,
-ignored inputs and omitted transitions. Reimplementing the tested algorithm or
-asserting a mock's own return is not an independent oracle. An id or test name alone
-is not evidence. Group all affected declared siblings under one finding.
+an independent oracle. Every declared specification-based coverage item needs
+evidence, and achieved coverage must meet the approved target. Structure-based
+obligations cite main's measured value, tool and target. Experience-based rows
+list their guessed defects. Check failure signals and post-failure state. Identify
+concrete violating behaviors such as constant results, ignored inputs and omitted
+transitions. Reimplementing the tested algorithm or asserting a mock's own return
+is not an independent oracle. An id or test name alone is not evidence. Group all
+affected declared siblings under one finding.
 
 For quality requirements check context, inputs, unit, threshold direction and
 provenance. Review procedures must be repeatable and name their artifacts. Mutation

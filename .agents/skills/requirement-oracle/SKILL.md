@@ -1,6 +1,6 @@
 ---
 name: requirement-oracle
-description: Help a user make unresolved functional or ISO quality decisions for a workflow spec. Use when intent, scope, expected behavior, quality applicability, measures, or thresholds cannot yet be approved.
+description: Help a user make unresolved functional or ISO quality decisions for a workflow spec. Use when intent, scope, expected behavior, quality applicability, measures, thresholds, or coverage targets cannot yet be approved.
 ---
 
 # Spec Decision Support
@@ -19,15 +19,19 @@ asking questions that the repository can answer. For remaining choices, explain:
 
 Resolve functional intent, observable failure behavior, boundaries and state
 transitions together with verification scope. Distinguish observable target surfaces
-from test layers; define required variant/layer combinations, exhaustive versus
-representative selection and the representatives with their rationale. Clarify
+from test layers and define required variant/layer combinations. Express scope as
+ISO/IEC/IEEE 29119-4 test design techniques, their enumerated coverage items, and
+a coverage target; a target below 100% names the selected items and rationale.
+Structure-based targets are measured by main through the Test command. Clarify
 lifecycle terms such as re-import versus restart. Do not assume a Cartesian product
 or narrow away an in-scope requirement. Separate a missing requirement from optional
-evidence strengthening, and explain what evidence will be sufficient for acceptance. Evaluate all nine ISO/IEC 25010:2023 product quality characteristics
-for applicability. For applicable characteristics, help select a context-specific
+evidence strengthening, and explain what evidence will be sufficient for acceptance.
+Evaluate all nine ISO/IEC 25010:2023 product quality characteristics for
+applicability. For applicable characteristics, help select a context-specific
 measure, inputs, unit, threshold and direction, and automated, review, or mutation
 evidence. ISO/IEC 25023 measure definitions do not determine the project's pass
-threshold. State that distinction when presenting a threshold choice.
+threshold, and 29119-4 coverage measures do not determine its coverage target.
+State that distinction when presenting a threshold or target choice.
 
 If the user cannot decide, leave the item unresolved and `workflow-approach`
 pauses. Only after explicit delegation recommend a conservative default that

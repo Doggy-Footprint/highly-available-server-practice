@@ -22,11 +22,15 @@ threshold or change its measurement context.
 ## Plan, implement, and check
 
 Use the approved Verification Obligations and Quality Requirements as the shared
-acceptance criteria. Build evidence for every declared variant, target surface,
-test layer and selected combination. Do not turn separately listed dimensions
-into an implicit Cartesian product or choose representatives yourself. Challenge
-missing requirements or ambiguous selection policies with a source reference;
-complete independent work while the affected obligations remain blocked.
+acceptance criteria. Build evidence for every declared variant, target surface
+and test layer by applying each obligation's declared ISO/IEC/IEEE 29119-4
+technique and exercising every enumerated coverage item. Do not derive extra
+items, turn separately listed dimensions into an implicit Cartesian product, or
+choose representatives yourself. Main measures structure-based targets; you
+receive only measured values and behavior-level gaps, never code locations.
+Challenge missing requirements or ambiguous selection policies with a source
+reference; complete independent work while the affected obligations remain
+blocked.
 
 For each obligation, identify the observation, independent expected-value source,
 concrete escaping defect, and assertion or review artifact that rejects it. Use
@@ -53,9 +57,10 @@ symbol is expected during parallel work; fix other load defects.
 ## Report
 
 - Spec version and files changed.
-- Complete coverage/evidence map: obligation and parent ids, variants, target surface, test layer and selection policy,
-  observation, expected-value source, escaping defect, procedure/artifact, and
-  test names; include justified inapplicable entries.
+- Complete coverage/evidence map: obligation and parent ids, variants, target
+  surface, test layer and selection policy, technique and coverage items
+  exercised, observation, expected-value source, escaping defect,
+  procedure/artifact, and test names; include justified inapplicable entries.
 - Correction impact: shared cause, affected obligations, checked siblings, changed
   dependencies and acceptance needing invalidation; or `none`.
 - Load-check command and result.
