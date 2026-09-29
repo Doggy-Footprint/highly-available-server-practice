@@ -1,8 +1,8 @@
 {
-  "version": "0.10.0",
+  "version": "0.13.0",
   "files": {
     ".harness/config.default.json": "c21d7705713f2a9bc8cd9527d87b8964b58c7ae1b5e63e83446371b2c68a4dbd",
-    ".harness/VERSION": "dc24feb5bd35084d8ae32a4eafbec12352707d4662401fcbcc9bbd696cde77a9",
+    ".harness/VERSION": "d84c9e596c7d6a94e5f74579ef8d8912a807b0d28582474900ad35dfb3edfcf4",
     ".harness/instructions/harness-block.md": "5699fbdccfa64cca5c701faaef9f9062c51317834adb89fae9ed2d335a63626b",
     ".harness/bin/workflow_marker.py": "3481c0c2953a524b680e2ae64ff12143bba0089bc4cad8ffa0877d4e7d16c3ba",
     ".harness/bin/spec_lifecycle.py": "589dda545410e92dc00e7acc86e3a54775b01ccdc40d9e487a49223448a74cff",
@@ -22,10 +22,10 @@
     ".harness/git/warn_new_comments.py": "0feef0063473a6279153eff875d08251a45e2265cd82f78295c0f8f83d4c0b8c",
     ".harness/git/post-merge": "333b095901d1c4606dacdbc3a18dbfa7670a744eab05e91e2e2faa79130bddfa",
     ".harness/git/pre-commit": "f9dc363e3f8d0e30b227168ee897b62b330ddbcea3b36be7c20c5ed7424151f5",
-    ".harness/git/verify_rules.py": "256996674b41cb1108fee4e29a447c753735919c4c6cd23e255a338b40221880",
+    ".harness/git/verify_rules.py": "092dd8ed88997dcd412c0b43bd129b9cc751f3e633639a5fb6faf9aeb7dd2f55",
     ".harness/skills/harness-import/SKILL.md": "947f1f83390047246bd40ed2a82afa2abde46c0d189db77ead76f49c20724208",
     ".harness/skills/requirement-oracle/SKILL.md": "2ebabdca8a9e50de8942e457a8a6401515530d420a12cbca0a15aecfef18a2fc",
-    ".harness/skills/workflow-approach/SKILL.md": "5eef0c303c0577b1cebd2d239d3f7291fd3a11c31ea0564b78996cbd0184add9",
+    ".harness/skills/workflow-approach/SKILL.md": "8787feafe694ec8437cc0a03cf37b4a688fe6c2d1c1a9d3e4669093bd7dc0f68",
     ".harness/skills/architecture-options/SKILL.md": "823b98a7677813aec396750337c10474bbd445a64d961277a80c8f825dc9f3a9",
     ".claude/agents/code-explorer.md": "40b81d4043a728454f1ebbe4543e61ec5908e7fc8a658b31b9062627462d05ac",
     ".codex/agents/code-explorer.toml": "03fb42abe7bef4b3adfe91869938b083aebe602d7c365cce2cc10c692fe4f6e1",
@@ -38,7 +38,7 @@
     ".agents/skills/architecture-options/SKILL.md": "823b98a7677813aec396750337c10474bbd445a64d961277a80c8f825dc9f3a9",
     ".agents/skills/harness-import/SKILL.md": "947f1f83390047246bd40ed2a82afa2abde46c0d189db77ead76f49c20724208",
     ".agents/skills/requirement-oracle/SKILL.md": "2ebabdca8a9e50de8942e457a8a6401515530d420a12cbca0a15aecfef18a2fc",
-    ".agents/skills/workflow-approach/SKILL.md": "5eef0c303c0577b1cebd2d239d3f7291fd3a11c31ea0564b78996cbd0184add9",
+    ".agents/skills/workflow-approach/SKILL.md": "8787feafe694ec8437cc0a03cf37b4a688fe6c2d1c1a9d3e4669093bd7dc0f68",
     ".github/workflows/harness-comment-warning.yml": "b1baf0b786612e52762ea4666b449ff89f745c54a553097ee00d0a113feb63d0"
   }
 }

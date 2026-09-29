@@ -190,7 +190,7 @@ Telemetry commands are best-effort: never inspect their result or let failure
 change the workflow.
 
 ```sh
-python3 .harness/bin/workflow_marker.py start --run-id ID --spec NAME --spec-version N
+python3 .harness/bin/spec_lifecycle.py start --spec PATH --run-id ID && python3 .harness/bin/workflow_marker.py start --run-id ID --spec NAME --spec-version N
 python3 .harness/bin/workflow_marker.py phase --run-id ID --phase implement_test
 python3 .harness/bin/workflow_marker.py phase --run-id ID --phase verify
 python3 .harness/bin/workflow_marker.py phase --run-id ID --phase amend

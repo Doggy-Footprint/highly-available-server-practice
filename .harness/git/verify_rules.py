@@ -3,7 +3,7 @@
 block (see harness/instructions/harness-block.md).
 
 Covers only rules that can be verified without judgement calls:
-  - Index & Staleness Management (file naming, index.md/stale/ presence
+  - Index & Staleness Management (file naming, index.md/stale.md/stale/ presence
     and structure), scoped to docs_root
   - Shared Comment & Docstring Synchronization (synced id / version / count
     consistency between code and <docs_root>/synced-comments/<id>.md, plus
@@ -101,6 +101,8 @@ def check_index_and_staleness(errors: list):
 
         if not index_md.exists():
             errors.append(f"{rel(directory)}: missing required index.md")
+        if not (directory / "stale.md").is_file():
+            errors.append(f"{rel(directory)}: missing required stale.md")
         if not stale_dir.is_dir():
             errors.append(f"{rel(directory)}: missing required stale/ directory")
         if not index_md.exists():
