@@ -4,6 +4,7 @@ description: Locates and cites the code a decision depends on. Use when the main
 claude.tools: Read, Grep, Glob
 claude.model: sonnet
 claude.disallowedTools: mcp__*
+codex.model: gpt-6.1-sol
 codex.sandbox_mode: read-only
 ---
 

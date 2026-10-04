@@ -4,7 +4,7 @@ A study-focused load testing project based on a flash-sale commerce system. Rath
 
 Check `README.md` for project roadmap. Keep in mind that this project is for education.
 
-<!-- harness:begin 0.13.0 -->
+<!-- harness:begin 0.16.1 -->
 # Documentation Guide
 
 "Documentation" refers to standalone docs, inline comments, and docstrings.
