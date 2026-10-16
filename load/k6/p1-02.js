@@ -17,7 +17,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 
-const BASE = __ENV.BASE_URL || 'http://localhost:8080';
+const BASE = __ENV.BASE_URL || 'http://localhost:38080';
 const PROFILE = __ENV.PROFILE || 'smoke';
 const BASE_USER_ID = 300; // user300.. — 49건 주문 유저 블록 (heavy 유저 제외)
 

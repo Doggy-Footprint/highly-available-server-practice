@@ -15,18 +15,18 @@ N ?= 1
 PROFILE ?= smoke
 
 ifeq ($(N),1)
-  # Phase 0: app 을 호스트 8000 에 고정 노출한다 (compose.direct.yaml).
+  # Phase 0: app 을 호스트 38000 에 고정 노출한다 (compose.direct.yaml).
   # k6 는 도커 네트워크 안에서 app 을 직접 때린다.
   UP_FILES    := $(FILES) -f deploy/compose.direct.yaml
   UP_PROFILES :=
   BASE_URL    ?= http://app:8000
-  HOST_URL    := http://localhost:8000
+  HOST_URL    := http://localhost:38000
 else
   # Phase 1+: 호스트에는 nginx 만 노출된다 (§11). app 은 포트를 열지 않는다.
   UP_FILES    := $(FILES)
   UP_PROFILES := --profile lb
   BASE_URL    ?= http://nginx
-  HOST_URL    := http://localhost:8080
+  HOST_URL    := http://localhost:38080
 endif
 
 COMPOSE     := docker compose -p $(PROJECT) $(FILES)
@@ -61,7 +61,7 @@ help:
 	@echo ""
 	@echo "  관측"
 	@echo "    make stats            리소스 제한이 실제로 걸렸는지 확인 (§13)"
-	@echo "    make grafana          localhost:3000"
+	@echo "    make grafana          localhost:33000"
 	@echo "    make psql / make redis-cli"
 
 up:
@@ -149,7 +149,7 @@ stats:
 		$$($(COMPOSE_ALL) ps -q)
 
 grafana:
-	@open http://localhost:3000 2>/dev/null || echo "http://localhost:3000 (admin/admin)"
+	@open http://localhost:33000 2>/dev/null || echo "http://localhost:33000 (admin/admin)"
 
 lint:
 	uv run ruff check app mockpg seed

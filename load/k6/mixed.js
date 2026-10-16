@@ -22,7 +22,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-const BASE = __ENV.BASE_URL || 'http://localhost:8000';
+const BASE = __ENV.BASE_URL || 'http://localhost:38000';
 const PROFILE = __ENV.PROFILE || 'smoke';
 
 // 느리지만 정상인 응답(무인덱스 seq scan)을 클라 타임아웃으로 실패 처리하지 않기 위한 상한.

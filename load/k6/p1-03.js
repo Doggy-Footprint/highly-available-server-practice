@@ -25,7 +25,7 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { Trend, Counter } from 'k6/metrics';
 
-const BASE = __ENV.BASE_URL || 'http://localhost:8080';
+const BASE = __ENV.BASE_URL || 'http://localhost:38080';
 const PROFILE = __ENV.PROFILE || 'smoke';
 
 // 느리지만 정상인 무인덱스 seq scan 응답을 클라 타임아웃으로 실패 처리하지 않기 위한 상한.

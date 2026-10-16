@@ -110,8 +110,21 @@ make psql / make redis-cli
 make kill-one      # 부하 중 앱 인스턴스 1대 강제 종료 (P2-08)
 make pause-redis / make unpause-redis   # Redis 장애 주입/복구 (P2-13)
 make stats         # docker stats — 리소스 제한 실제 적용 확인 (§13)
-make grafana       # localhost:3000
+make grafana       # localhost:33000
 ```
+
+### 호스트 노출 포트 (충돌 방지를 위해 30000번대 사용)
+컨테이너 내부 통신 포트(8000, 80, 5432, 6379 등)는 기본값을 유지하되, 호스트(`localhost`)로 바인딩되는 포트는 로컬 프로세스와의 충돌을 피하기 위해 모두 **30000번 이후**로 매핑한다.
+
+| 서비스 | 호스트 포트 (`localhost`) | 컨테이너 내부 포트 | 비고 |
+|---|---|---|---|
+| **app** (단일, `N=1`) | `38000` | `8000` | `compose.direct.yaml` (`make up`) |
+| **nginx** (LB, `N>1`) | `38080` | `80` | `make up N=3` |
+| **mockpg** | `38100` | `8000` | 외부 결제 mock |
+| **PostgreSQL** | `35432` | `5432` | 호스트 DB 클라이언트 접속용 |
+| **Redis** | `36379` | `6379` | 호스트 Redis 클라이언트 접속용 |
+| **Grafana** | `33000` | `3000` | `make grafana` (`admin` / `admin`) |
+| **Prometheus** | `39090` | `9090` | 메트릭 수집기 UI |
 
 ---
 
