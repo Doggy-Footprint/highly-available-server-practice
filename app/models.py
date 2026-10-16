@@ -89,7 +89,10 @@ class Product(Base):
     __table_args__ = (
         Index("ix_products_category_id", "category_id"),
         Index(
-            "ix_products_name_trgm", "name", postgresql_using="gin", postgresql_ops={"name": "gin_trgm_ops"}
+            "ix_products_name_trgm",
+            "name",
+            postgresql_using="gin",
+            postgresql_ops={"name": "gin_trgm_ops"},
         ),
         Index(
             "ix_products_description_trgm",

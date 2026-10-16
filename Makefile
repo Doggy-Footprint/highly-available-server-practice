@@ -35,10 +35,10 @@ COMPOSE_UP  := docker compose -p $(PROJECT) $(UP_FILES)
 COMPOSE_ALL := docker compose -p $(PROJECT) $(FILES) --profile lb
 
 .PHONY: help up down logs migrate revision seed reset-deal load check psql redis-cli \
-        kill-one pause-redis unpause-redis stats grafana ps clean lint
+        kill-one pause-redis unpause-redis stats grafana ps clean lint test
 
 help:
-	@echo "FlashMart — 실험 명령"
+	@echo "FlashMart — 실험 & 엔지니어링 명령"
 	@echo ""
 	@echo "  기동"
 	@echo "    make up               기본 기동 (app 1대, Phase 0 구성)"
@@ -53,7 +53,9 @@ help:
 	@echo "    make seed             COPY 기반 대량 적재 (수 분)"
 	@echo "    make reset-deal       딜 수량·주문 초기화 (스파이크 실험 전 필수)"
 	@echo ""
-	@echo "  실험"
+	@echo "  코드 검증 & 실험"
+	@echo "    make lint             ruff check + format check + mypy 정적 검증"
+	@echo "    make test [T=경로]    pytest 기능 및 적대적 테스트 실행"
 	@echo "    make load S=mixed [PROFILE=smoke|target|limit] [N=3]"
 	@echo "    make check S=oversell | S=dup_orders"
 	@echo "    make kill-one         app 1대 강제 종료 (P2-08)"
@@ -152,6 +154,9 @@ grafana:
 	@open http://localhost:33000 2>/dev/null || echo "http://localhost:33000 (admin/admin)"
 
 lint:
-	uv run ruff check app mockpg seed
-	uv run ruff format --check app mockpg seed
+	uv run ruff check app mockpg seed tests
+	uv run ruff format --check app mockpg seed tests
 	uv run mypy app mockpg seed
+
+test:
+	uv run pytest $(T)

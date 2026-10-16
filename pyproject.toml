@@ -64,3 +64,7 @@ exclude = "^migrations/"
 # asyncpg 는 py.typed 를 제공하지 않는다 (seed 가 COPY 때문에 직접 쓴다).
 module = ["asyncpg.*"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

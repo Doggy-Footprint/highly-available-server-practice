@@ -1,8 +1,10 @@
 # Project Definition
 
-A study-focused load testing project based on a flash-sale commerce system. Rather than building a live production service, the goal is to deliberately plant bottlenecks, crash the system under traffic, measure the failures, and fix them—leaving an end-to-end audit trail in Git history and performance logs.
+A study-focused load testing and hands-on production engineering project based on a flash-sale commerce system (**FlashMart**). It serves two core purposes:
+1. **Fail & Fix Load Lab**: Deliberately plant bottlenecks, crash the system under traffic, measure the failures, and verify fixes—leaving an end-to-end audit trail in Git history and performance logs.
+2. **Hands-on Architecture & Production Coding Track**: The user designs the architecture (`docs/designs/<ID>.md`), writes production-level code (`app/`, `migrations/`), and undergoes adversarial testing (`tests/adversarial/`, `k6`) and a 5-axis Staff-level PR review (`reports/<ID>-review.md`).
 
-Check `README.md` for project roadmap. Keep in mind that this project is for education.
+Adjust coaching, concept briefings, and review strictness according to the user's selected Difficulty Level (`Lv.1 Warm-up` to `Lv.4 Hardcore`) as defined in `README.md`. Before starting an issue/feature (`Step 1`), reviewing a design (`Step 2`), writing adversarial tests (`Step 4`), or grading production code (`Step 5`), ALWAYS read the corresponding section of `docs/reference/solution-guide.md` first to check valid approaches, must-check pitfalls, and test points—without spoiling the answer beyond the chosen difficulty or requested hint tier.
 
 <!-- harness:begin 0.22.0 -->
 # Documentation Guide
