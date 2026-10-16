@@ -237,6 +237,13 @@ def verifier_result(
     )
 
 
+def verification_result(run_id: str, **counts: int) -> bool:
+    workflow = active_workflow()
+    if workflow is None or workflow["workflow_run_id"] != run_id:
+        return False
+    return _emit({}, "verification_result", **counts, **workflow)
+
+
 def workflow_end(run_id: str, status: str) -> bool:
     workflow = active_workflow()
     if workflow is None or workflow["workflow_run_id"] != run_id:

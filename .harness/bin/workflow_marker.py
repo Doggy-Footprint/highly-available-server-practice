@@ -8,6 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
 import telemetry  # noqa: E402
 
 
+VERIFICATION_COUNTS = ("fuzz_execs", "fuzz_violations", "mutants", "killed", "survived", "equivalent", "overturned")
+
+
 class _QuietParser(argparse.ArgumentParser):
     def error(self, message):
         raise ValueError(message)
@@ -44,6 +47,16 @@ def _parser() -> argparse.ArgumentParser:
     verifier.add_argument("--seeds-run", required=True, type=_non_negative)
     verifier.add_argument("--seeds-detected", required=True, type=_non_negative)
 
+    verification = commands.add_parser("verification", add_help=False)
+    verification.add_argument("--run-id", required=True)
+    verification.add_argument("--fuzz-execs", required=True, type=_non_negative)
+    verification.add_argument("--fuzz-violations", required=True, type=_non_negative)
+    verification.add_argument("--mutants", required=True, type=_non_negative)
+    verification.add_argument("--killed", required=True, type=_non_negative)
+    verification.add_argument("--survived", required=True, type=_non_negative)
+    verification.add_argument("--equivalent", required=True, type=_non_negative)
+    verification.add_argument("--overturned", required=True, type=_non_negative)
+
     end = commands.add_parser("end", add_help=False)
     end.add_argument("--run-id", required=True)
     end.add_argument("--status", required=True, choices=("complete", "limit", "handoff", "aborted"))
@@ -68,6 +81,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.seeds_run,
                 args.seeds_detected,
             )
+        elif args.command == "verification":
+            telemetry.verification_result(args.run_id, **{name: getattr(args, name) for name in VERIFICATION_COUNTS})
         elif args.command == "end":
             telemetry.workflow_end(args.run_id, args.status)
     except Exception:

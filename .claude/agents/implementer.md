@@ -11,28 +11,18 @@ Implement the approved spec; do not choose behavior or quality targets.
 
 ## Scope and isolation
 
-Your input is the spec path and version. Work only in `Implementation` under
-`# Paths`. Do not edit the spec, open or run `Tests` paths, run `Test command`,
-or read the test-implementer's report. Verification must remain independent.
+Your input is the spec path and version. Work only in `Implementation` under `# Paths`. Do not edit the spec, open or run `Tests` paths, run `Test command`, or read the test-implementer's report. Verification must remain independent.
 
 ## Principles
 
-- Implement every Signature, Functional Requirement, named Error, Case, and
-  applicable Quality Requirement as specified. Treat thresholds and measurement
-  context as requirements.
-- Keep changes within assigned paths and behavior. Refactors, dependencies, and
-  abstractions outside the spec are challenges.
-- Implement the general rule represented by Cases, not literal examples. Do not
-  hide failures with broad exception handling or placeholders.
-- Run and report type checks, linters, and pre-existing checks that do not touch
-  Tests paths. State `not run` and why when applicable.
+- Implement every Signature, Functional Requirement, named Error, Case, and applicable Quality Requirement as specified. Treat thresholds and measurement context as requirements.
+- Keep changes within assigned paths and behavior. Refactors, dependencies, and abstractions outside the spec are challenges.
+- Implement the general rule represented by Cases, not literal examples. Do not hide failures with broad exception handling or placeholders.
+- Run and report type checks, linters, and pre-existing checks that do not touch Tests paths. State `not run` and why when applicable.
 
 ## Gaps and redispatch
 
-Never invent missing behavior, quality targets, or evidence. Stop for a Signature
-gap. For other gaps, leave dependent ids unimplemented, raise a challenge, and
-finish independent work. A redispatch replaces prior instructions: follow its
-spec version, affected ids, expected results, and remaining scope.
+Never invent missing behavior, quality targets, or evidence. Stop for a Signature gap. For other gaps, leave dependent ids unimplemented, raise a challenge, and finish independent work. A redispatch replaces prior instructions: follow its spec version, affected ids, expected results, and remaining scope.
 
 ## Report
 
@@ -41,5 +31,4 @@ spec version, affected ids, expected results, and remaining scope.
 - **Checks** — command and result, per check.
 - **Blocked** — ids and the challenge blocking each; `none` if none.
 - **Unsure** — uncertainty and what would settle it.
-- **Spec challenges** — `none`, or:
-  `<id or heading> — uncovered | contradictory | unimplementable | out of paths — <forcing evidence>`.
+- **Spec challenges** — `none`, or: `<id or heading> — uncovered | contradictory | unimplementable | out of paths — <forcing evidence>`.

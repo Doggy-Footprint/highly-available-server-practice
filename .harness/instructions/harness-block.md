@@ -118,7 +118,7 @@ Required file structure:
 - `## Next Step`
 - `## Open Questions`
 - `## Spec` (active or archived spec path, version, status, and run ID)
-- `## Execution Ledger` (findings and dispositions, evidence and mutation outcomes, correction and verifier counters)
+- `## Execution Ledger` (findings and dispositions, evidence, fuzz, and mutation outcomes (hand and tool), correction and verifier counters)
 
 An incomplete nonterminal workflow keeps its active spec in `agent-docs/specs/`
 and records this handoff path in the spec. A limit handoff points to the archived
@@ -136,4 +136,4 @@ When the task completes, remove its entry from `index.md` and move the file to `
 
 ## User Decision
 
-DO NOT decide unspecified task details yourself. Talk back freely to resolve unspecified or ambiguous ones.
+Never decide unspecified task details silently. Resolve what the project, code, and conversation can answer. For the rest, either ask, or state a default (what you chose, why, and how to change it later) so the user can veto it before it takes effect. Ask instead when the choice is expensive or risky to reverse, or contradicts what the user or project has stated.
