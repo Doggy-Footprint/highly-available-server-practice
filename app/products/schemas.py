@@ -16,7 +16,7 @@ class ProductSummary(BaseModel):
 
 class ProductListResponse(BaseModel):
     total: int  # P1-05: 매 요청 COUNT(*) 로 채운다
-    page: int
+    next_cursor: int | None # What about previous?
     size: int
     items: list[ProductSummary]
 

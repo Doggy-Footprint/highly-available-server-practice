@@ -14,11 +14,11 @@ main_router = APIRouter(prefix="/main", tags=["main"])
 async def list_products(
     category: int | None = Query(default=None),
     q: str | None = Query(default=None),
-    page: int = Query(default=0, ge=0),
+    cursor: int | None = Query(default=None, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.ProductListResponse:
-    return await service.list_products(session, q, category, page, size)
+    return await service.list_products(session, q, category, cursor, size)
 
 
 @router.get("/{product_id}", response_model=schemas.ProductDetail)

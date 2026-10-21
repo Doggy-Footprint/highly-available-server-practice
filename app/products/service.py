@@ -6,14 +6,21 @@ from app.products import repository, schemas
 
 
 async def list_products(
-    session: AsyncSession, q: str | None, category_id: int | None, page: int, size: int
+    session: AsyncSession, q: str | None, category_id: int | None, cursor: int | None, size: int
 ) -> schemas.ProductListResponse:
-    items = await repository.search_products(session, q, category_id, page, size)
+    items = await repository.search_products(session, q, category_id, cursor, size)
+    further_items = await repository.search_products(session, q, category_id, cursor, size + 1)
+
+    if (further_items and len(further_items) > size):
+        next_cursor = further_items[size - 1].id
+    else:
+        next_cursor = None
+
     # P1-05: 목록을 뽑은 뒤 total 을 또 COUNT(*) 로 구한다 (매 요청).
     total = await repository.count_products(session, q, category_id)
     return schemas.ProductListResponse(
         total=total,
-        page=page,
+        next_cursor=next_cursor,
         size=size,
         items=[
             schemas.ProductSummary(

@@ -27,12 +27,12 @@ def _filtered(q: str | None, category_id: int | None) -> Select[tuple[Product]]:
 
 
 async def search_products(
-    session: AsyncSession, q: str | None, category_id: int | None, page: int, size: int
+    session: AsyncSession, q: str | None, category_id: int | None, cursor: int | None, size: int
 ) -> Sequence[Product]:
-    # INTENDED-ISSUE: P1-04
-    # OFFSET 페이지네이션. 깊은 페이지(page 5000급)면 앞의 page*size 행을 스캔해서 버린다 —
-    # 페이지가 깊어질수록 선형으로 느려진다. fix 에서 keyset(cursor)로 바꾼다.
-    stmt = _filtered(q, category_id).order_by(Product.id).limit(size).offset(page * size)
+    if cursor is not None:
+        stmt = _filtered(q, category_id).where(Product.id > cursor).order_by(Product.id).limit(size)
+    else:
+        stmt = _filtered(q, category_id).order_by(Product.id).limit(size)
     return (await session.scalars(stmt)).all()
 
 
