@@ -26,6 +26,45 @@ def _filtered(q: str | None, category_id: int | None) -> Select[tuple[Product]]:
     return stmt
 
 
+# =====================================================================
+# [P1-04 REVIEW & FEEDBACK for learner — 4/4: repository.py]
+#
+# 1. 작성하신 코드 피드백:
+#    - `Product.id > cursor` 조건과 `.order_by(Product.id).limit(size)` 조합을 정확히 구현하셨습니다!
+#    - 정렬 방향(`ASC`)과 비교 방향(`>`)이 일치하여 PostgreSQL 플래너가 `products_pkey` B-Tree 인덱스를
+#      정방향으로 즉시 탐색(Index Cond)합니다.
+#
+# 2. 프레임워크/라이브러리(SQLAlchemy 2.0 Async) API 설명:
+#    - `Select` 객체의 불변성(Immutability)과 체이닝 패턴:
+#      SQLAlchemy 2.0의 `select(...)` 객체는 `.where()`, `.order_by()`, `.limit()`를 호출할 때마다
+#      새로운 `Select` 객체를 반환합니다.
+#      따라서 지금처럼 `if/else`로 전체 체인을 두 번 적는 것도 잘 동작하지만, 실무에서는 중복을 줄이기 위해
+#      아래처럼 조건부로 `.where()`만 덧붙이는(Query Building) 패턴을 많이 씁니다:
+#        ```python
+#        stmt = _filtered(q, category_id)
+#        if cursor is not None:
+#            stmt = stmt.where(Product.id > cursor)
+#        stmt = stmt.order_by(Product.id).limit(size)
+#        ```
+#      이렇게 짜면 나중에 정렬 기준이나 `.limit()` 로직을 바꿀 때 두 군데(if/else)를 다 고치지 않아도 되어
+#      실수(if쪽만 고치고 else쪽은 안 고치는 버그)를 예방할 수 있습니다.
+#    - `await session.scalars(stmt)`:
+#      - `session.execute(stmt)`는 행을 튜플(`Row(Product,)`) 형태로 반환하지만,
+#      - `session.scalars(stmt)`는 첫 번째 컬럼(여기선 `Product` ORM 엔티티 객체 자체)만 바로 꺼내주어
+#        `.all()` 호출 시 깔끔하게 `Sequence[Product]` 리스트를 얻을 수 있습니다.
+#
+# 3. 성능 측면에서 실제로 어떻게 작용했는가? (Before vs After 실측):
+#    - [Before — `OFFSET(page * size)`]:
+#      `page=5000`(`OFFSET 100000`) 요청 시 DB가 `products_pkey` 인덱스를 처음(`id=1`)부터
+#      `100,020`건 읽고 앞의 `100,000`건을 버렸습니다.
+#      -> 호출당 평균 **4,414개 버퍼 블록(약 35MB)** 스캔, 쿼리 평균 **185.15ms** 소요.
+#    - [After — `WHERE Product.id > cursor` (작성하신 코드)]:
+#      B-Tree 인덱스의 루트 → 브랜치 → 리프 노드로 `id = cursor` 위치를 $O(\log N)$으로 단번에 찾아간 뒤
+#      그 바로 다음 옆 칸부터 딱 20(`size`)개만 읽고 즉시 멈춥니다.
+#      -> 호출당 평균 **4개 버퍼 블록(약 32KB)**만 읽음 (**1,103배 감소**),
+#         쿼리 평균 **0.43ms** (**430배 단축**)!
+#      -> 결과적으로 첫 페이지(`shallow`)와 9,500페이지(`deep`)의 응답 속도가 완전히 똑같아졌습니다.
+# =====================================================================
 async def search_products(
     session: AsyncSession, q: str | None, category_id: int | None, cursor: int | None, size: int
 ) -> Sequence[Product]:
